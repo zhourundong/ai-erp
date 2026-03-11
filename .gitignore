@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build
+target/
+dist/
+build/
+
+# Database
+*.db
+data/
+
+# Logs
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+
+# Vite cache
+.vite/
