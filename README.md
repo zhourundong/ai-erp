@@ -40,7 +40,8 @@ AI-ERP是一个**AI原生**的企业资源规划系统，将AI能力深度融入
 - **自然语言交互** - 通过对话完成所有业务操作
 - **流式响应 (SSE)** - 实时返回AI思考过程和回复，支持长任务处理
 - **工具智能调用** - AI可调用业务工具完成复杂任务
-- **多模型支持** - 支持 Claude、OpenAI 等主流 AI 模型（基于 LangChain4j）
+- **AI唤起GUI** - AI可通过对话触发页面导航、打开创建表单、查看详情
+- **多模型支持** - 支持 OpenAI 兼容的 AI 模型（基于 LangChain4j）
 - **会话记忆** - 支持多会话上下文记忆
 
 ### 采购供应链模块
@@ -85,6 +86,7 @@ AI助手可通过以下工具执行业务操作：
 | **SupplierTools** | 查询供应商信息、供应商列表 |
 | **CustomerTools** | 查询客户信息、客户列表、信用额度 |
 | **WarehouseTools** | 查询仓库信息、仓库列表 |
+| **NavigationTools** | 页面导航、打开创建表单、查看详情（实现AI唤起GUI） |
 
 ---
 
@@ -111,8 +113,6 @@ cd ai-erp
 cd ai-erp-server
 
 # 配置AI模型API Key（必需）
-export ANTHROPIC_API_KEY=your-claude-api-key
-# 或
 export OPENAI_API_KEY=your-openai-api-key
 
 # 启动服务
@@ -235,7 +235,8 @@ ai-erp/
 │   │   │       ├── ProductTools.java
 │   │   │       ├── SupplierTools.java
 │   │   │       ├── CustomerTools.java
-│   │   │       └── WarehouseTools.java
+│   │   │       ├── WarehouseTools.java
+│   │   │       └── NavigationTools.java
 │   │   ├── agent/                    # AI Agent编排
 │   │   │   └── AgentOrchestrator.java
 │   │   ├── entity/                   # 实体类
@@ -246,7 +247,7 @@ ai-erp/
 │   │       └── UserContext.java
 │   ├── src/main/resources/
 │   │   └── application.yml           # 主配置
-│   ├── src/test/                     # 单元测试 (17个测试文件)
+│   ├── src/test/                     # 单元测试 (18个测试文件)
 │   └── pom.xml
 │
 ├── ai-erp-web/                       # 前端应用
@@ -276,7 +277,7 @@ ai-erp/
 │
 ├── docs/                             # 文档
 │   └── architecture.md               # 架构设计文档
-│
+├── TODO.md                           # 任务清单
 └── README.md                         # 项目说明
 ```
 
@@ -300,14 +301,13 @@ spring:
     driver-class-name: org.sqlite.JDBC
 
 # AI模型配置
-ai:
-  model: claude  # 或 openai
-  claude:
-    api-key: ${ANTHROPIC_API_KEY:}
-    model: claude-sonnet-4-6-20250514
-  openai:
-    api-key: ${OPENAI_API_KEY:}
-    model: gpt-4o
+spring:
+  ai:
+    models:
+      openai:
+        base-url: ${OPENAI_BASE_URL:}
+        api-key: ${OPENAI_API_KEY:}
+        model: ${OPENAI_MODEL:gpt-4o}
 
 # JWT配置
 jwt:
@@ -319,8 +319,9 @@ jwt:
 
 | 变量名 | 说明 | 默认值 |
 |-------|------|--------|
-| `ANTHROPIC_API_KEY` | Claude API密钥 | - |
 | `OPENAI_API_KEY` | OpenAI API密钥 | - |
+| `OPENAI_BASE_URL` | API地址（可配置兼容服务） | - |
+| `OPENAI_MODEL` | 模型名称 | gpt-4o |
 | `JWT_SECRET` | JWT签名密钥 | ai-erp-jwt-secret-key |
 | `SERVER_PORT` | 服务端口 | 8080 |
 
@@ -372,9 +373,10 @@ Content-Type: application/json
 ```
 
 响应格式 (SSE):
-- `event: thinking` - AI思考过程
-- `event: token` - 响应文本片段
+- `event: thinking` - AI思考过程（Base64编码）
+- `event: token` - 响应文本片段（Base64编码）
 - `event: tool` - 工具执行信息
+- `event: action` - 导航动作（AI唤起GUI）
 - `event: complete` - 完成事件
 - `event: error` - 错误事件
 
@@ -428,7 +430,9 @@ npm run test
 
 ## 路线图
 
-### v0.1.0 (MVP)
+> 详细任务清单请查看 [TODO.md](./TODO.md)
+
+### v0.0.1 (MVP) - 已完成 ✅
 
 - [x] 用户登录认证
 - [x] AI对话交互（流式响应）
@@ -442,14 +446,26 @@ npm run test
 - [x] 用户管理
 - [x] 组织管理
 
-### v0.2.0 (计划中)
+### v0.1.0 (AI能力完善) - 已完成 ✅
+
+- [x] AI工具调用（8个业务工具）
+- [x] AI唤起GUI机制
+- [x] 思考过程展示
+- [x] 多会话管理
+
+### v0.2.0 (体验优化) - 计划中
 
 - [ ] 工具调用可视化优化
+- [ ] 多会话搜索与导出
+- [ ] 错误重试机制
+
+### v0.3.0 (智能增强) - 规划中
+
 - [ ] 发票OCR识别
 - [ ] 合同智能审核
-- [ ] 多会话管理
+- [ ] 企业知识库（RAG）
 
-### v0.3.0 (规划中)
+### v0.4.0 (扩展能力) - 规划中
 
 - [ ] 多租户支持
 - [ ] 移动端适配

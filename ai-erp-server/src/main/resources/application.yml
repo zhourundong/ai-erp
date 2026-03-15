@@ -7,18 +7,12 @@ spring:
     url: jdbc:sqlite:./data/aierp.db
     driver-class-name: org.sqlite.JDBC
 
-  # AI Model Configuration - 多模型可配置
+  # AI Model Configuration
   ai:
     models:
-      # 默认使用的模型
-      default: ${AI_DEFAULT_MODEL:openai}
-      claude:
-        enabled: ${CLAUDE_ENABLED:false}
-        api-key: ${ANTHROPIC_API_KEY:}
-        model: ${CLAUDE_MODEL:claude-sonnet-4-6-20250514}
       openai:
         enabled: ${OPENAI_ENABLED:true}
-        base-url: https://qianfan.baidubce.com/v2/coding
+        base-url: ${OPENAI_BASE_URL:}
         api-key: ${OPENAI_API_KEY:}
         model: ${OPENAI_MODEL:glm-5}
       # 预留：本地模型扩展点

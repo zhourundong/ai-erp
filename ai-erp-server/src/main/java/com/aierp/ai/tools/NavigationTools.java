@@ -34,6 +34,7 @@ public class NavigationTools {
         map.put("purchase-orders", "/purchase-orders");
         map.put("sales-orders", "/sales-orders");
         map.put("inventory", "/inventory");
+        map.put("inventory-transactions", "/inventory-transactions");
         map.put("products", "/products");
         map.put("suppliers", "/suppliers");
         map.put("customers", "/customers");
@@ -79,7 +80,7 @@ public class NavigationTools {
     @Tool("导航到指定页面。当用户要求打开某个页面、查看列表、浏览数据时使用。例如：'打开采购订单列表'、'查看库存'、'去商品管理'")
     @ToolName("导航到页面")
     public String navigate(
-        @P("目标页面: purchase-orders(采购订单), sales-orders(销售订单), inventory(库存), products(商品), suppliers(供应商), customers(客户), warehouses(仓库), purchase-requests(采购申请), dashboard(仪表盘)") String page,
+        @P("目标页面: purchase-orders(采购订单), sales-orders(销售订单), inventory(库存), inventory-transactions(库存流水), products(商品), suppliers(供应商), customers(客户), warehouses(仓库), purchase-requests(采购申请), dashboard(仪表盘)") String page,
         @P(value = "可选的过滤条件JSON，如 {\"status\":\"PENDING\"} 或 {\"keyword\":\"关键词\"}", required = false) String filter
     ) {
         log.info("导航工具调用: page={}, filter={}", page, filter);
@@ -211,6 +212,7 @@ public class NavigationTools {
             case "purchase-orders" -> "采购订单列表";
             case "sales-orders" -> "销售订单列表";
             case "inventory" -> "库存查询";
+            case "inventory-transactions" -> "库存流水";
             case "products" -> "商品管理";
             case "suppliers" -> "供应商管理";
             case "customers" -> "客户管理";
