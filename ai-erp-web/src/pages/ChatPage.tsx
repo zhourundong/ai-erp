@@ -33,8 +33,16 @@ function processThinkingText(text: string): string {
   return text
 }
 
+// 格式化耗时显示
+function formatDuration(ms: number | undefined): string {
+  if (!ms) return ''
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
+  return `${Math.floor(ms / 60000)}m ${((ms % 60000) / 1000).toFixed(0)}s`
+}
+
 // 思考过程折叠组件 - 管理自己的展开/折叠状态
-function ThinkingCollapse({ thinking, isLoading }: { thinking: string; isLoading?: boolean }) {
+function ThinkingCollapse({ thinking, isLoading, thinkingTimeMs }: { thinking: string; isLoading?: boolean; thinkingTimeMs?: number }) {
   const [activeKey, setActiveKey] = useState<string[]>(isLoading ? ['thinking'] : [])
 
   // 当 loading 状态变化时更新展开状态
@@ -60,6 +68,9 @@ function ThinkingCollapse({ thinking, isLoading }: { thinking: string; isLoading
           label: (
             <span className="thinking-header">
               <BulbOutlined /> 思考过程
+              {thinkingTimeMs && !isLoading && (
+                <span className="thinking-duration"> · {formatDuration(thinkingTimeMs)}</span>
+              )}
             </span>
           ),
           children: (
@@ -188,6 +199,8 @@ export default function ChatPage() {
           loading: false,
           intent: response.intent,
           toolResult: response.toolResult,
+          thinkingTimeMs: response.thinkingTimeMs,
+          processingTimeMs: response.processingTimeMs,
         })
         abortControllers.delete(loadingMsgId)
       },
@@ -385,6 +398,7 @@ export default function ChatPage() {
                         <ThinkingCollapse
                           thinking={message.thinking}
                           isLoading={message.loading}
+                          thinkingTimeMs={message.thinkingTimeMs}
                         />
                       )}
                       {message.intent && (
@@ -402,8 +416,15 @@ export default function ChatPage() {
                         )}
                         {message.loading && <span className="typing-cursor">▌</span>}
                       </div>
-                      <div className="message-time">
-                        {new Date(message.timestamp).toLocaleTimeString()}
+                      <div className="message-meta">
+                        <span className="message-time">
+                          {new Date(message.timestamp).toLocaleTimeString()}
+                        </span>
+                        {message.processingTimeMs && (
+                          <span className="message-duration">
+                            {`耗时 ${formatDuration(message.processingTimeMs)}`}
+                          </span>
+                        )}
                       </div>
                     </>
                   )}

@@ -10,6 +10,8 @@ export interface Message {
   toolResult?: any
   loading?: boolean
   thinking?: string  // 思考过程
+  thinkingTimeMs?: number  // 思考耗时(毫秒)
+  processingTimeMs?: number  // 总响应耗时(毫秒)
 }
 
 export interface ChatSession {

@@ -230,6 +230,10 @@ class EventSourcePolyfill extends EventTarget {
   private closed = false
   private completed = false
   private timeoutId: ReturnType<typeof setTimeout> | null = null
+  // 跨数据包的解析状态
+  private pendingEvent = ''
+  private pendingDataLines: string[] = []
+  private pendingLine = ''
 
   constructor(
     url: string,
@@ -295,40 +299,46 @@ class EventSourcePolyfill extends EventTarget {
       const newContent = responseText.slice(buffer.length)
       buffer = responseText
 
-      // 解析SSE事件
-      // SSE规范：data字段可能跨多行，每个data:行用换行符连接
-      const lines = newContent.split('\n')
-      let currentEvent = ''
-      let currentDataLines: string[] = []
+      // 解析SSE事件 - 使用实例变量保存跨数据包状态
+      // 将上一个数据包可能不完整的行与本次新内容合并
+      const fullContent = this.pendingLine + newContent
+      const lines = fullContent.split('\n')
 
-      for (const line of lines) {
+      // 最后一行可能不完整，先保存起来
+      this.pendingLine = lines.pop() || ''
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+
         if (line.startsWith('event:')) {
-          currentEvent = line.slice(6).trim()
-          console.log('[SSE解析] event:', currentEvent)
+          this.pendingEvent = line.slice(6).trim()
+          console.log('[SSE解析] event:', this.pendingEvent)
         } else if (line.startsWith('data:')) {
-          // 累积 data 行（SSE 规范中多个 data 行用换行符连接）
+          // 累积 data 行
           const dataContent = line.slice(5)
-          currentDataLines.push(dataContent)
+          this.pendingDataLines.push(dataContent)
           console.log('[SSE解析] data行:', dataContent)
-        } else if (line === '' && (currentEvent || currentDataLines.length > 0)) {
-          // 空行表示事件结束，派发事件
-          const currentData = currentDataLines.join('\n')
-          console.log('[SSE解析] 派发事件:', currentEvent || 'message', '数据:', currentData)
+        } else if (line === '' && (this.pendingEvent || this.pendingDataLines.length > 0)) {
+          // 空行表示事件结束
+          const currentData = this.pendingDataLines.join('\n')
+
+          // 派发事件
+          console.log('[SSE解析] 派发事件:', this.pendingEvent || 'message', '数据长度:', currentData.length)
 
           // 如果收到complete事件，标记为已完成
-          if (currentEvent === 'complete') {
+          if (this.pendingEvent === 'complete') {
             this.completed = true
           }
 
           // 派发事件
-          const eventName = currentEvent || 'message'
+          const eventName = this.pendingEvent || 'message'
           const event = new CustomEvent(eventName, { detail: currentData })
           Object.defineProperty(event, 'data', { value: currentData })
           this.dispatchEvent(event)
 
           // 重置状态
-          currentEvent = ''
-          currentDataLines = []
+          this.pendingEvent = ''
+          this.pendingDataLines = []
         }
       }
     }

@@ -53,6 +53,11 @@ public class ChatResponse {
     private Long processingTimeMs;
 
     /**
+     * 思考耗时(毫秒)
+     */
+    private Long thinkingTimeMs;
+
+    /**
      * 响应时间
      */
     @Builder.Default

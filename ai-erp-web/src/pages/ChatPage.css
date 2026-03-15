@@ -266,11 +266,25 @@
   text-decoration: underline;
 }
 
+.message-meta {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
 .message-time {
   font-size: 12px;
   color: #9ca3af;
-  margin-top: 8px;
-  text-align: right;
+}
+
+.message-duration {
+  font-size: 12px;
+  color: #8b5cf6;
+  background: #f3e8ff;
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 
 .message-wrapper.user .message-time {
@@ -377,6 +391,12 @@
 
 .thinking-header .anticon {
   margin-right: 6px;
+}
+
+.thinking-duration {
+  color: #6b7280;
+  font-weight: 400;
+  font-size: 12px;
 }
 
 .thinking-content {

@@ -126,7 +126,7 @@ public class OpenAIAdapter implements ModelAdapter {
                     }
                 }
             }
-            callback.onComplete(content);
+            callback.onComplete(content, null);
             return;
         }
 
@@ -134,6 +134,9 @@ public class OpenAIAdapter implements ModelAdapter {
         final int[] tokenCount = {0};
         final boolean[] receivedFirstThinking = {false};
         final boolean[] receivedFirstContent = {false};
+        // 思考耗时统计
+        final long[] thinkingStartTime = {0};
+        final long[] thinkingEndTime = {0};
 
         try {
             // 构建消息列表
@@ -147,9 +150,11 @@ public class OpenAIAdapter implements ModelAdapter {
             openAiStreamingChatModel.chat(messages, new StreamingChatResponseHandler() {
                 @Override
                 public void onPartialResponse(String partialResponse) {
+                    // 第一个content token到达，思考阶段结束
                     if (!receivedFirstContent[0]) {
                         receivedFirstContent[0] = true;
-                        log.info("收到第一个content token (耗时: {}ms)", System.currentTimeMillis() - startTime);
+                        thinkingEndTime[0] = System.currentTimeMillis();
+                        log.info("收到第一个content token (思考耗时: {}ms)", thinkingEndTime[0] - (thinkingStartTime[0] > 0 ? thinkingStartTime[0] : startTime));
                     }
                     tokenCount[0]++;
                     fullResponse.get().append(partialResponse);
@@ -161,8 +166,11 @@ public class OpenAIAdapter implements ModelAdapter {
                     // 处理 reasoning_content（推理过程）
                     if (!receivedFirstThinking[0]) {
                         receivedFirstThinking[0] = true;
-                        log.info("收到第一个thinking token (耗时: {}ms)", System.currentTimeMillis() - startTime);
+                        thinkingStartTime[0] = System.currentTimeMillis();
+                        log.info("收到第一个thinking token (耗时: {}ms)", thinkingStartTime[0] - startTime);
                     }
+                    // 更新思考结束时间（每次thinking token都更新）
+                    thinkingEndTime[0] = System.currentTimeMillis();
                     tokenCount[0]++;
                     // 从 PartialThinking 中提取 text
                     if (partialThinking != null) {
@@ -176,9 +184,14 @@ public class OpenAIAdapter implements ModelAdapter {
                 @Override
                 public void onCompleteResponse(dev.langchain4j.model.chat.response.ChatResponse response) {
                     long processingTime = System.currentTimeMillis() - startTime;
-                    log.info("流式响应完成，耗时: {}ms, token数: {}, 内容长度: {}",
-                        processingTime, tokenCount[0], fullResponse.get().length());
-                    callback.onComplete(fullResponse.get().toString());
+                    // 计算思考耗时
+                    Long thinkingTime = null;
+                    if (thinkingStartTime[0] > 0 && thinkingEndTime[0] > 0) {
+                        thinkingTime = thinkingEndTime[0] - startTime;
+                    }
+                    log.info("流式响应完成，总耗时: {}ms, 思考耗时: {}ms, token数: {}, 内容长度: {}",
+                        processingTime, thinkingTime, tokenCount[0], fullResponse.get().length());
+                    callback.onComplete(fullResponse.get().toString(), thinkingTime);
                 }
 
                 @Override

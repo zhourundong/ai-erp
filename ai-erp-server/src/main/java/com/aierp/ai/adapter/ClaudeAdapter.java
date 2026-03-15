@@ -99,7 +99,7 @@ public class ClaudeAdapter implements ModelAdapter {
         if (!isStreamingAvailable()) {
             // 降级到非流式
             com.aierp.ai.dto.ChatResponse response = chat(request);
-            callback.onComplete(response.getContent());
+            callback.onComplete(response.getContent(), null);
             return;
         }
 
@@ -124,7 +124,7 @@ public class ClaudeAdapter implements ModelAdapter {
                 public void onCompleteResponse(dev.langchain4j.model.chat.response.ChatResponse response) {
                     long processingTime = System.currentTimeMillis() - startTime;
                     log.info("流式响应完成，耗时: {}ms, 长度: {}", processingTime, fullResponse.get().length());
-                    callback.onComplete(fullResponse.get().toString());
+                    callback.onComplete(fullResponse.get().toString(), null);
                 }
 
                 @Override

@@ -67,8 +67,10 @@ public interface ModelAdapter {
 
         /**
          * 流式完成
+         * @param fullResponse 完整响应内容
+         * @param thinkingTimeMs 思考耗时(毫秒)，可能为null
          */
-        void onComplete(String fullResponse);
+        void onComplete(String fullResponse, Long thinkingTimeMs);
 
         /**
          * 发生错误

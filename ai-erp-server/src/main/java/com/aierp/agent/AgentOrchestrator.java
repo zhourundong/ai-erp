@@ -158,15 +158,16 @@ public class AgentOrchestrator {
                 }
 
                 @Override
-                public void onComplete(String fullResponse) {
+                public void onComplete(String fullResponse, Long thinkingTimeMs) {
                     long totalTime = System.currentTimeMillis() - startTime;
-                    log.info("[流式处理] 完成: 总耗时={}ms, token数={}, 内容长度={}",
-                        totalTime, tokenCount[0], fullResponse != null ? fullResponse.length() : 0);
+                    log.info("[流式处理] 完成: 总耗时={}ms, 思考耗时={}ms, token数={}, 内容长度={}",
+                        totalTime, thinkingTimeMs, tokenCount[0], fullResponse != null ? fullResponse.length() : 0);
                     ChatResponse response = ChatResponse.builder()
                             .content(fullResponse)
                             .model(model.getModelName())
                             .intent(finalIntent)
                             .processingTimeMs(totalTime)
+                            .thinkingTimeMs(thinkingTimeMs)
                             .timestamp(LocalDateTime.now())
                             .build();
                     callback.onComplete(response);
