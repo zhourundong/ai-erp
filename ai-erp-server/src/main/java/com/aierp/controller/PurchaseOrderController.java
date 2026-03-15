@@ -1,6 +1,7 @@
 package com.aierp.controller;
 
 import com.aierp.common.Result;
+import com.aierp.dto.ReceiveRequest;
 import com.aierp.entity.PurchaseOrder;
 import com.aierp.entity.PurchaseOrderItem;
 import com.aierp.service.PurchaseOrderService;
@@ -45,15 +46,62 @@ public class PurchaseOrderController {
     }
 
     @PutMapping("/{id}")
-    public Result<PurchaseOrder> update(@PathVariable Long id, @RequestBody PurchaseOrder order) {
+    public Result<PurchaseOrder> update(@PathVariable Long id, @RequestBody Map<String, Object> params) {
+        PurchaseOrder order = convertToOrder(params);
         order.setId(id);
-        return Result.success(purchaseOrderService.updateOrder(order));
+        List<PurchaseOrderItem> items = convertToItems(params);
+        return Result.success(purchaseOrderService.updateOrderWithItems(order, items));
     }
 
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         purchaseOrderService.deleteOrder(id);
         return Result.success();
+    }
+
+    /**
+     * 提交审批
+     */
+    @PostMapping("/{id}/submit")
+    public Result<PurchaseOrder> submit(@PathVariable Long id) {
+        return Result.success(purchaseOrderService.submitForApproval(id));
+    }
+
+    /**
+     * 审批通过
+     */
+    @PostMapping("/{id}/approve")
+    public Result<PurchaseOrder> approve(@PathVariable Long id) {
+        return Result.success(purchaseOrderService.approve(id));
+    }
+
+    /**
+     * 审批拒绝
+     */
+    @PostMapping("/{id}/reject")
+    public Result<PurchaseOrder> reject(@PathVariable Long id) {
+        return Result.success(purchaseOrderService.reject(id));
+    }
+
+    /**
+     * 反审核
+     */
+    @PostMapping("/{id}/unapprove")
+    public Result<PurchaseOrder> unapprove(@PathVariable Long id) {
+        return Result.success(purchaseOrderService.unapprove(id));
+    }
+
+    /**
+     * 收货入库
+     */
+    @PostMapping("/{id}/receive")
+    public Result<PurchaseOrder> receive(@PathVariable Long id, @RequestBody ReceiveRequest request) {
+        return Result.success(purchaseOrderService.receiveGoods(
+                id,
+                request.getWarehouseId(),
+                request.getItems(),
+                request.getOperator()
+        ));
     }
 
     @SuppressWarnings("unchecked")

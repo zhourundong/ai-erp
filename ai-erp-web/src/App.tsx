@@ -10,7 +10,7 @@ import CustomerPage from './pages/CustomerPage'
 import ProductPage from './pages/ProductPage'
 import WarehousePage from './pages/WarehousePage'
 import InventoryPage from './pages/InventoryPage'
-import PurchaseRequestPage from './pages/PurchaseRequestPage'
+import InventoryTransactionPage from './pages/InventoryTransactionPage'
 import PurchaseOrderPage from './pages/PurchaseOrderPage'
 import SalesOrderPage from './pages/SalesOrderPage'
 
@@ -35,7 +35,7 @@ function App() {
           <Route path="customers" element={<CustomerPage />} />
           <Route path="warehouses" element={<WarehousePage />} />
           <Route path="inventory" element={<InventoryPage />} />
-          <Route path="purchase-requests" element={<PurchaseRequestPage />} />
+          <Route path="inventory-transactions" element={<InventoryTransactionPage />} />
           <Route path="purchase-orders" element={<PurchaseOrderPage />} />
           <Route path="sales-orders" element={<SalesOrderPage />} />
         </Route>

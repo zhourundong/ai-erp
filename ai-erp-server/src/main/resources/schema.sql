@@ -145,7 +145,8 @@ CREATE TABLE IF NOT EXISTS purchase_requests (
     request_date DATE NOT NULL,
     applicant_id INTEGER,
     applicant_name VARCHAR(50),
-    department VARCHAR(100),
+    department_id INTEGER,
+    department_name VARCHAR(100),
     requirement_description TEXT,
     ai_parsed_result TEXT,
     ai_recommendation TEXT,
@@ -161,7 +162,8 @@ CREATE TABLE IF NOT EXISTS purchase_requests (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     deleted INTEGER DEFAULT 0,
-    FOREIGN KEY (applicant_id) REFERENCES users(id)
+    FOREIGN KEY (applicant_id) REFERENCES users(id),
+    FOREIGN KEY (department_id) REFERENCES organizations(id)
 );
 
 -- 采购申请明细表

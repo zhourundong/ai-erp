@@ -1,6 +1,8 @@
 package com.aierp.controller;
 
 import com.aierp.common.Result;
+import com.aierp.dto.CreateOrderFromRequest;
+import com.aierp.entity.PurchaseOrder;
 import com.aierp.entity.PurchaseRequest;
 import com.aierp.entity.PurchaseRequestItem;
 import com.aierp.service.PurchaseRequestService;
@@ -82,12 +84,23 @@ public class PurchaseRequestController {
         return Result.success(purchaseRequestService.reject(id, approverId, approverName, comment));
     }
 
+    /**
+     * 从采购申请生成采购订单
+     */
+    @PostMapping("/{id}/create-order")
+    public Result<PurchaseOrder> createOrder(
+            @PathVariable Long id,
+            @RequestBody CreateOrderFromRequest params) {
+        return Result.success(purchaseRequestService.createOrderFromRequest(id, params));
+    }
+
     @SuppressWarnings("unchecked")
     private PurchaseRequest convertToRequest(Map<String, Object> params) {
         PurchaseRequest request = new PurchaseRequest();
         if (params.get("applicantId") != null) request.setApplicantId(Long.valueOf(params.get("applicantId").toString()));
         if (params.get("applicantName") != null) request.setApplicantName(params.get("applicantName").toString());
-        if (params.get("department") != null) request.setDepartment(params.get("department").toString());
+        if (params.get("departmentId") != null) request.setDepartmentId(Long.valueOf(params.get("departmentId").toString()));
+        if (params.get("departmentName") != null) request.setDepartmentName(params.get("departmentName").toString());
         if (params.get("requirementDescription") != null) request.setRequirementDescription(params.get("requirementDescription").toString());
         if (params.get("priority") != null) request.setPriority(params.get("priority").toString());
         return request;

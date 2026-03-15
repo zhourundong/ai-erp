@@ -23,7 +23,12 @@ api.interceptors.request.use(
 // 响应拦截器
 api.interceptors.response.use(
   (response) => {
-    return response.data
+    const data = response.data
+    // 检查业务状态码
+    if (data.code && data.code !== 200) {
+      return Promise.reject(data)
+    }
+    return data
   },
   (error) => {
     if (error.response?.status === 401) {
@@ -112,8 +117,12 @@ export const inventoryApi = {
   list: (params: { pageNum: number; pageSize: number; warehouseId?: number; productId?: number }) =>
     api.get('/inventory', { params }),
   get: (warehouseId: number, productId: number) => api.get(`/inventory/${warehouseId}/${productId}`),
-  stockIn: (data: any) => api.post('/inventory/stock-in', data),
-  stockOut: (data: any) => api.post('/inventory/stock-out', data),
+  stockIn: (data: { warehouseId: number; productId: number; quantity: number; costPrice?: number; productSku?: string; productName?: string; transactionType?: string; operator?: string }) =>
+    api.post('/inventory/stock-in', data),
+  stockOut: (data: { warehouseId: number; productId: number; quantity: number; unitPrice?: number; transactionType?: string; operator?: string }) =>
+    api.post('/inventory/stock-out', data),
+  transactions: (params: { pageNum: number; pageSize: number; warehouseId?: number; productId?: number; transactionType?: string }) =>
+    api.get('/inventory/transactions', { params }),
 }
 
 // 采购申请API
@@ -130,6 +139,8 @@ export const purchaseRequestApi = {
     api.post(`/purchase/requests/${id}/approve`, null, { params: data }),
   reject: (id: number, data: { approverId: number; approverName: string; comment?: string }) =>
     api.post(`/purchase/requests/${id}/reject`, null, { params: data }),
+  createOrder: (id: number, data: { supplierId: number; supplierName: string; buyerId?: number; buyerName?: string }) =>
+    api.post(`/purchase/requests/${id}/create-order`, data),
 }
 
 // 采购订单API
@@ -141,6 +152,12 @@ export const purchaseOrderApi = {
   create: (data: any) => api.post('/purchase/orders', data),
   update: (id: number, data: any) => api.put(`/purchase/orders/${id}`, data),
   delete: (id: number) => api.delete(`/purchase/orders/${id}`),
+  submit: (id: number) => api.post(`/purchase/orders/${id}/submit`),
+  approve: (id: number) => api.post(`/purchase/orders/${id}/approve`),
+  reject: (id: number) => api.post(`/purchase/orders/${id}/reject`),
+  unapprove: (id: number) => api.post(`/purchase/orders/${id}/unapprove`),
+  receive: (id: number, data: { warehouseId: number; items: { itemId: number; quantity: number }[]; operator?: string }) =>
+    api.post(`/purchase/orders/${id}/receive`, data),
 }
 
 // 销售订单API
@@ -152,6 +169,12 @@ export const salesOrderApi = {
   create: (data: any) => api.post('/sales/orders', data),
   update: (id: number, data: any) => api.put(`/sales/orders/${id}`, data),
   delete: (id: number) => api.delete(`/sales/orders/${id}`),
+  confirm: (id: number, warehouseId: number) =>
+    api.post(`/sales/orders/${id}/confirm`, null, { params: { warehouseId } }),
+  unconfirm: (id: number) => api.post(`/sales/orders/${id}/unconfirm`),
+  cancel: (id: number) => api.post(`/sales/orders/${id}/cancel`),
+  ship: (id: number, data: { warehouseId: number; items: { itemId: number; quantity: number }[]; operator?: string }) =>
+    api.post(`/sales/orders/${id}/ship`, data),
 }
 
 // AI对话API

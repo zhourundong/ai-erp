@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Table, Card, Button, Space, Tag, Modal, Form, Select, InputNumber, message } from 'antd'
 import { PlusOutlined, MinusOutlined } from '@ant-design/icons'
 import { inventoryApi, warehouseApi, productApi } from '../services/api'
+import { useAuthStore } from '../stores/authStore'
 import type { ColumnsType } from 'antd/es/table'
 
 interface Inventory {
@@ -28,6 +29,7 @@ interface Product {
 }
 
 export default function InventoryPage() {
+  const { user } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<Inventory[]>([])
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
@@ -94,7 +96,8 @@ export default function InventoryPage() {
         ...values,
         productSku: product?.sku,
         productName: product?.name,
-        operator: 'admin',
+        transactionType: 'OTHER_IN',
+        operator: user?.realName || user?.username || '系统',
       })
       message.success('入库成功')
       setStockInVisible(false)
@@ -108,7 +111,8 @@ export default function InventoryPage() {
     try {
       await inventoryApi.stockOut({
         ...values,
-        operator: 'admin',
+        transactionType: 'OTHER_OUT',
+        operator: user?.realName || user?.username || '系统',
       })
       message.success('出库成功')
       setStockOutVisible(false)

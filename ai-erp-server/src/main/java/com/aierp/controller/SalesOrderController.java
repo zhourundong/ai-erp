@@ -1,6 +1,7 @@
 package com.aierp.controller;
 
 import com.aierp.common.Result;
+import com.aierp.dto.ShipRequest;
 import com.aierp.entity.SalesOrder;
 import com.aierp.entity.SalesOrderItem;
 import com.aierp.service.SalesOrderService;
@@ -45,15 +46,54 @@ public class SalesOrderController {
     }
 
     @PutMapping("/{id}")
-    public Result<SalesOrder> update(@PathVariable Long id, @RequestBody SalesOrder order) {
+    public Result<SalesOrder> update(@PathVariable Long id, @RequestBody Map<String, Object> params) {
+        SalesOrder order = convertToOrder(params);
         order.setId(id);
-        return Result.success(salesOrderService.updateOrder(order));
+        List<SalesOrderItem> items = convertToItems(params);
+        return Result.success(salesOrderService.updateOrderWithItems(order, items));
     }
 
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         salesOrderService.deleteOrder(id);
         return Result.success();
+    }
+
+    /**
+     * 确认订单（检查库存）
+     */
+    @PostMapping("/{id}/confirm")
+    public Result<SalesOrder> confirm(@PathVariable Long id, @RequestParam Long warehouseId) {
+        return Result.success(salesOrderService.confirm(id, warehouseId));
+    }
+
+    /**
+     * 取消订单
+     */
+    @PostMapping("/{id}/cancel")
+    public Result<SalesOrder> cancel(@PathVariable Long id) {
+        return Result.success(salesOrderService.cancel(id));
+    }
+
+    /**
+     * 反确认订单
+     */
+    @PostMapping("/{id}/unconfirm")
+    public Result<SalesOrder> unconfirm(@PathVariable Long id) {
+        return Result.success(salesOrderService.unconfirm(id));
+    }
+
+    /**
+     * 发货出库
+     */
+    @PostMapping("/{id}/ship")
+    public Result<SalesOrder> ship(@PathVariable Long id, @RequestBody ShipRequest request) {
+        return Result.success(salesOrderService.shipGoods(
+                id,
+                request.getWarehouseId(),
+                request.getItems(),
+                request.getOperator()
+        ));
     }
 
     @SuppressWarnings("unchecked")

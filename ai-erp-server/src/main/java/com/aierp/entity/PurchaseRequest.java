@@ -29,8 +29,11 @@ public class PurchaseRequest {
     /** 申请人姓名 */
     private String applicantName;
 
-    /** 部门 */
-    private String department;
+    /** 部门ID */
+    private Long departmentId;
+
+    /** 部门名称 */
+    private String departmentName;
 
     /** 自然语言需求描述 */
     private String requirementDescription;

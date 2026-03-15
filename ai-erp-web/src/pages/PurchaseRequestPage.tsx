@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Table, Card, Button, Space, Tag, Modal, Form, Input, message, Descriptions } from 'antd'
-import { PlusOutlined, EyeOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons'
-import { purchaseRequestApi } from '../services/api'
+import { Table, Card, Button, Space, Tag, Modal, Form, Input, Select, message, Descriptions, TreeSelect } from 'antd'
+import { PlusOutlined, EyeOutlined, CheckOutlined, CloseOutlined, FileAddOutlined } from '@ant-design/icons'
+import { purchaseRequestApi, supplierApi, organizationApi } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -10,25 +10,44 @@ interface PurchaseRequest {
   requestNo: string
   requestDate: string
   applicantName: string
-  department: string
+  departmentId: number
+  departmentName: string
   requirementDescription: string
   status: string
   aiEstimatedAmount: number
   approverName: string
   approvalComment: string
+  purchaseOrderId: number
   createdAt: string
+}
+
+interface Supplier {
+  id: number
+  name: string
+}
+
+interface OrgNode {
+  id: number
+  name: string
+  parentId: number
+  type: string
+  children?: OrgNode[]
 }
 
 export default function PurchaseRequestPage() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<PurchaseRequest[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [orgTree, setOrgTree] = useState<OrgNode[]>([])
   const [total, setTotal] = useState(0)
   const [pageNum, setPageNum] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [modalVisible, setModalVisible] = useState(false)
   const [detailVisible, setDetailVisible] = useState(false)
+  const [createOrderVisible, setCreateOrderVisible] = useState(false)
   const [currentRequest, setCurrentRequest] = useState<PurchaseRequest | null>(null)
   const [form] = Form.useForm()
+  const [createOrderForm] = Form.useForm()
   const { user } = useAuthStore()
 
   const fetchData = async () => {
@@ -44,8 +63,28 @@ export default function PurchaseRequestPage() {
     }
   }
 
+  const fetchSuppliers = async () => {
+    try {
+      const response: any = await supplierApi.list({ pageNum: 1, pageSize: 100 })
+      setSuppliers(response.data?.records || [])
+    } catch (error) {
+      console.error('获取供应商失败', error)
+    }
+  }
+
+  const fetchOrganizations = async () => {
+    try {
+      const response: any = await organizationApi.tree()
+      setOrgTree(response.data || [])
+    } catch (error) {
+      console.error('获取组织失败', error)
+    }
+  }
+
   useEffect(() => {
     fetchData()
+    fetchSuppliers()
+    fetchOrganizations()
   }, [pageNum, pageSize])
 
   const handleAdd = () => {
@@ -59,9 +98,24 @@ export default function PurchaseRequestPage() {
   }
 
   const handleSubmit = async (values: any) => {
+    // 从组织树中查找部门名称
+    const findOrgName = (nodes: OrgNode[], id: number): string => {
+      for (const node of nodes) {
+        if (node.id === id) return node.name
+        if (node.children) {
+          const found = findOrgName(node.children, id)
+          if (found) return found
+        }
+      }
+      return ''
+    }
+
+    const departmentName = findOrgName(orgTree, values.departmentId)
+
     try {
       await purchaseRequestApi.create({
         ...values,
+        departmentName,
         applicantId: user?.id,
         applicantName: user?.realName,
       })
@@ -123,6 +177,30 @@ export default function PurchaseRequestPage() {
     })
   }
 
+  // 打开生成订单弹窗
+  const handleOpenCreateOrder = (record: PurchaseRequest) => {
+    setCurrentRequest(record)
+    createOrderForm.resetFields()
+    setCreateOrderVisible(true)
+  }
+
+  // 从申请生成订单
+  const handleCreateOrder = async (values: any) => {
+    try {
+      const response: any = await purchaseRequestApi.createOrder(currentRequest!.id, {
+        supplierId: values.supplierId,
+        supplierName: suppliers.find(s => s.id === values.supplierId)?.name || '',
+        buyerId: user?.id,
+        buyerName: user?.realName,
+      })
+      message.success(`采购订单创建成功: ${response.data?.orderNo || ''}`)
+      setCreateOrderVisible(false)
+      fetchData()
+    } catch (error: any) {
+      message.error(error.message || '创建订单失败')
+    }
+  }
+
   const statusMap: Record<string, { color: string; text: string }> = {
     DRAFT: { color: 'default', text: '草稿' },
     PENDING: { color: 'processing', text: '待审批' },
@@ -134,7 +212,7 @@ export default function PurchaseRequestPage() {
     { title: '申请单号', dataIndex: 'requestNo', width: 150 },
     { title: '申请日期', dataIndex: 'requestDate', width: 120 },
     { title: '申请人', dataIndex: 'applicantName', width: 100 },
-    { title: '部门', dataIndex: 'department', width: 120 },
+    { title: '部门', dataIndex: 'departmentName', width: 120 },
     {
       title: '需求描述',
       dataIndex: 'requirementDescription',
@@ -158,9 +236,9 @@ export default function PurchaseRequestPage() {
     {
       title: '操作',
       key: 'action',
-      width: 250,
+      width: 300,
       render: (_, record) => (
-        <Space size="small">
+        <Space size="small" wrap>
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)}>
             详情
           </Button>
@@ -179,10 +257,27 @@ export default function PurchaseRequestPage() {
               </Button>
             </>
           )}
+          {record.status === 'APPROVED' && !record.purchaseOrderId && (
+            <Button type="link" size="small" icon={<FileAddOutlined />} onClick={() => handleOpenCreateOrder(record)}>
+              生成订单
+            </Button>
+          )}
+          {record.purchaseOrderId && (
+            <Tag color="blue">已生成订单</Tag>
+          )}
         </Space>
       ),
     },
   ]
+
+  // 转换组织树为 TreeSelect 格式
+  const convertToTreeData = (nodes: OrgNode[]): any[] => {
+    return nodes.map(node => ({
+      value: node.id,
+      title: node.name,
+      children: node.children ? convertToTreeData(node.children) : undefined,
+    }))
+  }
 
   return (
     <Card
@@ -219,8 +314,12 @@ export default function PurchaseRequestPage() {
         width={600}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item name="department" label="部门">
-            <Input />
+          <Form.Item name="departmentId" label="部门" rules={[{ required: true }]}>
+            <TreeSelect
+              placeholder="请选择部门"
+              treeData={convertToTreeData(orgTree)}
+              treeDefaultExpandAll
+            />
           </Form.Item>
           <Form.Item name="requirementDescription" label="需求描述" rules={[{ required: true }]}>
             <Input.TextArea rows={4} placeholder="请描述您的采购需求..." />
@@ -240,7 +339,7 @@ export default function PurchaseRequestPage() {
             <Descriptions.Item label="申请单号">{currentRequest.requestNo}</Descriptions.Item>
             <Descriptions.Item label="申请日期">{currentRequest.requestDate}</Descriptions.Item>
             <Descriptions.Item label="申请人">{currentRequest.applicantName}</Descriptions.Item>
-            <Descriptions.Item label="部门">{currentRequest.department}</Descriptions.Item>
+            <Descriptions.Item label="部门">{currentRequest.departmentName}</Descriptions.Item>
             <Descriptions.Item label="需求描述" span={2}>
               {currentRequest.requirementDescription}
             </Descriptions.Item>
@@ -258,8 +357,32 @@ export default function PurchaseRequestPage() {
             {currentRequest.approvalComment && (
               <Descriptions.Item label="审批意见">{currentRequest.approvalComment}</Descriptions.Item>
             )}
+            {currentRequest.purchaseOrderId && (
+              <Descriptions.Item label="采购订单ID">{currentRequest.purchaseOrderId}</Descriptions.Item>
+            )}
           </Descriptions>
         )}
+      </Modal>
+
+      <Modal
+        title="生成采购订单"
+        open={createOrderVisible}
+        onCancel={() => setCreateOrderVisible(false)}
+        onOk={() => createOrderForm.submit()}
+        width={500}
+      >
+        <Form form={createOrderForm} layout="vertical" onFinish={handleCreateOrder}>
+          <Form.Item name="supplierId" label="选择供应商" rules={[{ required: true }]}>
+            <Select placeholder="请选择供应商">
+              {suppliers.map(s => (
+                <Select.Option key={s.id} value={s.id}>{s.name}</Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <p style={{ color: '#666', marginBottom: 0 }}>
+            将根据采购申请明细自动生成采购订单
+          </p>
+        </Form>
       </Modal>
     </Card>
   )

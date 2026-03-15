@@ -11,6 +11,7 @@ import {
   ShoppingOutlined,
   InboxOutlined,
   DollarOutlined,
+  DatabaseOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../stores/authStore'
 import './MainLayout.css'
@@ -28,7 +29,6 @@ const menuItems = [
     icon: <ShoppingOutlined />,
     label: '采购管理',
     children: [
-      { key: '/purchase-requests', label: '采购申请' },
       { key: '/purchase-orders', label: '采购订单' },
     ],
   },
@@ -46,8 +46,7 @@ const menuItems = [
     label: '库存管理',
     children: [
       { key: '/inventory', label: '库存查询' },
-      { key: '/warehouses', label: '仓库管理' },
-      { key: '/products', label: '商品管理' },
+      { key: '/inventory-transactions', label: '库存流水' },
     ],
   },
   {
@@ -57,6 +56,15 @@ const menuItems = [
     children: [
       { key: '/suppliers', label: '供应商管理' },
       { key: '/customers', label: '客户管理' },
+    ],
+  },
+  {
+    key: 'basic',
+    icon: <DatabaseOutlined />,
+    label: '基础资料',
+    children: [
+      { key: '/products', label: '商品管理' },
+      { key: '/warehouses', label: '仓库管理' },
     ],
   },
   {
@@ -119,14 +127,14 @@ export default function MainLayout() {
     if (pathParts.length > 0) {
       // 根据路径返回父菜单
       const parentMenus: Record<string, string> = {
-        'purchase-requests': 'procurement',
         'purchase-orders': 'procurement',
         'sales-orders': 'sales',
         'customers': 'partners',
         'suppliers': 'partners',
         'inventory': 'inventory',
-        'warehouses': 'inventory',
-        'products': 'inventory',
+        'inventory-transactions': 'inventory',
+        'warehouses': 'basic',
+        'products': 'basic',
         'users': 'system',
         'organizations': 'system',
       }

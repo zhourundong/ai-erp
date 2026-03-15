@@ -1,7 +1,12 @@
 package com.aierp.service;
 
+import com.aierp.dto.CreateOrderFromRequest;
+import com.aierp.entity.PurchaseOrder;
+import com.aierp.entity.PurchaseOrderItem;
 import com.aierp.entity.PurchaseRequest;
 import com.aierp.entity.PurchaseRequestItem;
+import com.aierp.mapper.PurchaseOrderItemMapper;
+import com.aierp.mapper.PurchaseOrderMapper;
 import com.aierp.mapper.PurchaseRequestItemMapper;
 import com.aierp.mapper.PurchaseRequestMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -17,6 +22,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.aierp.common.BusinessException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -32,10 +38,17 @@ class PurchaseRequestServiceTest {
     @Mock
     private PurchaseRequestItemMapper purchaseRequestItemMapper;
 
+    @Mock
+    private PurchaseOrderMapper purchaseOrderMapper;
+
+    @Mock
+    private PurchaseOrderItemMapper purchaseOrderItemMapper;
+
     @InjectMocks
     private PurchaseRequestService purchaseRequestService;
 
     private PurchaseRequest testRequest;
+    private PurchaseRequestItem testItem;
 
     @BeforeEach
     void setUp() {
@@ -47,6 +60,16 @@ class PurchaseRequestServiceTest {
         testRequest.setApplicantName("张三");
         testRequest.setStatus("DRAFT");
         testRequest.setRequirementDescription("需要100个M8螺丝");
+
+        testItem = new PurchaseRequestItem();
+        testItem.setId(1L);
+        testItem.setRequestId(1L);
+        testItem.setProductId(100L);
+        testItem.setProductSku("SKU001");
+        testItem.setProductName("M8螺丝");
+        testItem.setQuantity(new BigDecimal("100"));
+        testItem.setUnit("个");
+        testItem.setEstimatedPrice(new BigDecimal("0.50"));
     }
 
     @Test
@@ -146,7 +169,7 @@ class PurchaseRequestServiceTest {
         when(purchaseRequestMapper.selectById(1L)).thenReturn(testRequest);
 
         // When & Then
-        assertThrows(RuntimeException.class, () -> {
+        assertThrows(BusinessException.class, () -> {
             purchaseRequestService.submitForApproval(1L);
         });
     }
@@ -201,5 +224,168 @@ class PurchaseRequestServiceTest {
         // Then
         verify(purchaseRequestItemMapper).delete(any());
         verify(purchaseRequestMapper).deleteById(1L);
+    }
+
+    // ========== 新增功能测试：从申请生成订单 ==========
+
+    @Test
+    void testCreateOrderFromRequest_Success() {
+        // Given
+        testRequest.setStatus("APPROVED");
+        when(purchaseRequestMapper.selectById(1L)).thenReturn(testRequest);
+        when(purchaseRequestItemMapper.findByRequestId(1L)).thenReturn(List.of(testItem));
+        when(purchaseOrderMapper.insert(any(PurchaseOrder.class))).thenAnswer(invocation -> {
+            PurchaseOrder o = invocation.getArgument(0);
+            o.setId(10L);
+            return 1;
+        });
+        when(purchaseOrderItemMapper.insert(any(PurchaseOrderItem.class))).thenReturn(1);
+        when(purchaseRequestMapper.updateById(any(PurchaseRequest.class))).thenReturn(1);
+        when(purchaseOrderMapper.selectCount(any())).thenReturn(0L);
+
+        CreateOrderFromRequest params = new CreateOrderFromRequest();
+        params.setSupplierId(1L);
+        params.setSupplierName("测试供应商");
+        params.setBuyerId(1L);
+        params.setBuyerName("张三");
+
+        // When
+        PurchaseOrder result = purchaseRequestService.createOrderFromRequest(1L, params);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1L, result.getSupplierId());
+        assertEquals("测试供应商", result.getSupplierName());
+        assertEquals(1L, result.getRequestId());
+        assertEquals("DRAFT", result.getStatus());
+        verify(purchaseOrderMapper).insert(any(PurchaseOrder.class));
+        verify(purchaseOrderItemMapper).insert(any(PurchaseOrderItem.class));
+        verify(purchaseRequestMapper).updateById(any(PurchaseRequest.class));
+    }
+
+    @Test
+    void testCreateOrderFromRequest_WithCustomItems() {
+        // Given
+        testRequest.setStatus("APPROVED");
+        when(purchaseRequestMapper.selectById(1L)).thenReturn(testRequest);
+        when(purchaseRequestItemMapper.findByRequestId(1L)).thenReturn(List.of(testItem));
+        when(purchaseOrderMapper.insert(any(PurchaseOrder.class))).thenAnswer(invocation -> {
+            PurchaseOrder o = invocation.getArgument(0);
+            o.setId(10L);
+            return 1;
+        });
+        when(purchaseOrderItemMapper.insert(any(PurchaseOrderItem.class))).thenReturn(1);
+        when(purchaseRequestMapper.updateById(any(PurchaseRequest.class))).thenReturn(1);
+        when(purchaseOrderMapper.selectCount(any())).thenReturn(0L);
+
+        CreateOrderFromRequest params = new CreateOrderFromRequest();
+        params.setSupplierId(1L);
+        params.setSupplierName("测试供应商");
+
+        // 自定义明细
+        CreateOrderFromRequest.OrderItemInput customItem = new CreateOrderFromRequest.OrderItemInput();
+        customItem.setRequestItemId(1L);
+        customItem.setProductId(100L);
+        customItem.setProductName("M8螺丝(定制)");
+        customItem.setQuantity(new BigDecimal("50"));
+        customItem.setUnitPrice(new BigDecimal("0.60"));
+        params.setItems(List.of(customItem));
+
+        // When
+        PurchaseOrder result = purchaseRequestService.createOrderFromRequest(1L, params);
+
+        // Then
+        assertNotNull(result);
+        verify(purchaseOrderItemMapper).insert(argThat(item ->
+            "M8螺丝(定制)".equals(item.getProductName()) &&
+            new BigDecimal("50").equals(item.getQuantity())
+        ));
+    }
+
+    @Test
+    void testCreateOrderFromRequest_NotApproved() {
+        // Given
+        testRequest.setStatus("PENDING"); // 未审批
+        when(purchaseRequestMapper.selectById(1L)).thenReturn(testRequest);
+
+        CreateOrderFromRequest params = new CreateOrderFromRequest();
+        params.setSupplierId(1L);
+        params.setSupplierName("测试供应商");
+
+        // When & Then
+        assertThrows(BusinessException.class, () -> {
+            purchaseRequestService.createOrderFromRequest(1L, params);
+        });
+    }
+
+    @Test
+    void testCreateOrderFromRequest_AlreadyHasOrder() {
+        // Given
+        testRequest.setStatus("APPROVED");
+        testRequest.setPurchaseOrderId(100L); // 已生成订单
+        when(purchaseRequestMapper.selectById(1L)).thenReturn(testRequest);
+
+        CreateOrderFromRequest params = new CreateOrderFromRequest();
+        params.setSupplierId(1L);
+        params.setSupplierName("测试供应商");
+
+        // When & Then
+        assertThrows(BusinessException.class, () -> {
+            purchaseRequestService.createOrderFromRequest(1L, params);
+        });
+    }
+
+    @Test
+    void testCreateOrderFromRequest_EmptyItems() {
+        // Given
+        testRequest.setStatus("APPROVED");
+        when(purchaseRequestMapper.selectById(1L)).thenReturn(testRequest);
+        when(purchaseRequestItemMapper.findByRequestId(1L)).thenReturn(List.of()); // 空明细
+
+        CreateOrderFromRequest params = new CreateOrderFromRequest();
+        params.setSupplierId(1L);
+        params.setSupplierName("测试供应商");
+
+        // When & Then
+        assertThrows(BusinessException.class, () -> {
+            purchaseRequestService.createOrderFromRequest(1L, params);
+        });
+    }
+
+    @Test
+    void testCreateOrderFromRequest_RequestNotFound() {
+        // Given
+        when(purchaseRequestMapper.selectById(1L)).thenReturn(null);
+
+        CreateOrderFromRequest params = new CreateOrderFromRequest();
+        params.setSupplierId(1L);
+        params.setSupplierName("测试供应商");
+
+        // When & Then
+        assertThrows(BusinessException.class, () -> {
+            purchaseRequestService.createOrderFromRequest(1L, params);
+        });
+    }
+
+    @Test
+    void testCreateOrderFromRequest_InvalidItem() {
+        // Given
+        testRequest.setStatus("APPROVED");
+        when(purchaseRequestMapper.selectById(1L)).thenReturn(testRequest);
+        when(purchaseRequestItemMapper.findByRequestId(1L)).thenReturn(List.of(testItem));
+
+        CreateOrderFromRequest params = new CreateOrderFromRequest();
+        params.setSupplierId(1L);
+        params.setSupplierName("测试供应商");
+
+        // 使用不存在的明细ID
+        CreateOrderFromRequest.OrderItemInput invalidItem = new CreateOrderFromRequest.OrderItemInput();
+        invalidItem.setRequestItemId(999L); // 不存在的ID
+        params.setItems(List.of(invalidItem));
+
+        // When & Then
+        assertThrows(BusinessException.class, () -> {
+            purchaseRequestService.createOrderFromRequest(1L, params);
+        });
     }
 }
