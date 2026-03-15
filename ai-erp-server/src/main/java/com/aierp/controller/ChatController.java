@@ -4,6 +4,7 @@ import com.aierp.agent.AgentOrchestrator;
 import com.aierp.ai.dto.ChatRequest;
 import com.aierp.ai.dto.ChatResponse;
 import com.aierp.ai.dto.NavigationResult;
+import com.aierp.ai.tools.ToolNameResolver;
 import com.aierp.context.UserContext;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 public class ChatController {
 
     private final AgentOrchestrator agentOrchestrator;
+    private final ToolNameResolver toolNameResolver;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
 
     /**
@@ -190,10 +192,14 @@ public class ChatController {
                     public void onToolExecuted(dev.langchain4j.service.tool.ToolExecution toolExecution) {
                         if (isCompleted[0]) return;
                         try {
-                            log.info("工具执行: {}", toolExecution.request().name());
+                            String toolName = toolExecution.request().name();
+                            String chineseName = toolNameResolver.resolveChineseName(toolName);
+                            log.info("工具执行: {} ({})", chineseName, toolName);
+
                             // 发送工具执行事件
                             java.util.Map<String, Object> toolInfo = new java.util.HashMap<>();
-                            toolInfo.put("name", toolExecution.request().name());
+                            toolInfo.put("name", toolName);
+                            toolInfo.put("chineseName", chineseName);
                             toolInfo.put("arguments", toolExecution.request().arguments());
                             toolInfo.put("result", toolExecution.result());
                             emitter.send(SseEmitter.event()

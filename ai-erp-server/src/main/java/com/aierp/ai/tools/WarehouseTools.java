@@ -28,6 +28,7 @@ public class WarehouseTools {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Tool("创建仓库。需要仓库名称等基本信息。返回仓库ID和编码。")
+    @ToolName("创建仓库")
     public String createWarehouse(
             @P("仓库名称，必填") String name,
             @P(value = "仓库类型，如：成品仓、原料仓、半成品仓", required = false) String type,
@@ -76,6 +77,7 @@ public class WarehouseTools {
     }
 
     @Tool("搜索仓库。支持关键词搜索和分页。返回仓库列表JSON。")
+    @ToolName("搜索仓库")
     public String searchWarehouses(
             @P(value = "搜索关键词，可以是仓库名称或编码", required = false) String keyword,
             @P(value = "页码，从1开始，默认1", required = false) Integer pageNum,
@@ -118,6 +120,7 @@ public class WarehouseTools {
     }
 
     @Tool("获取仓库详情。返回仓库完整信息JSON。")
+    @ToolName("获取仓库详情")
     public String getWarehouseDetail(@P("仓库ID") Long warehouseId) {
 
         try {
@@ -149,6 +152,7 @@ public class WarehouseTools {
     }
 
     @Tool("获取所有可用仓库列表。返回所有状态正常的仓库。")
+    @ToolName("获取所有仓库")
     public String listAllWarehouses() {
 
         try {

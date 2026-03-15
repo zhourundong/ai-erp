@@ -29,6 +29,7 @@ public class SupplierTools {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Tool("创建供应商。需要供应商基本信息。返回供应商ID和编码。")
+    @ToolName("创建供应商")
     public String createSupplier(
             @P("供应商名称，必填") String name,
             @P(value = "供应商简称", required = false) String shortName,
@@ -91,6 +92,7 @@ public class SupplierTools {
     }
 
     @Tool("搜索供应商。支持关键词搜索和分页。返回供应商列表JSON。")
+    @ToolName("搜索供应商")
     public String searchSuppliers(
             @P(value = "搜索关键词，可以是供应商名称、编码或联系人", required = false) String keyword,
             @P(value = "页码，从1开始，默认1", required = false) Integer pageNum,
@@ -135,6 +137,7 @@ public class SupplierTools {
     }
 
     @Tool("推荐优质供应商。根据商品类别和最低评分筛选推荐供应商。返回推荐列表JSON。")
+    @ToolName("推荐供应商")
     public String recommendSuppliers(
             @P(value = "商品类别，如：办公用品、电子设备、原材料。不填则推荐所有类别", required = false) String category,
             @P(value = "最低评分，数字，默认70分", required = false) Double minScore) {
@@ -179,6 +182,7 @@ public class SupplierTools {
     }
 
     @Tool("获取供应商详情。返回供应商完整信息JSON。")
+    @ToolName("获取供应商详情")
     public String getSupplierDetail(@P("供应商ID") Long supplierId) {
 
         try {

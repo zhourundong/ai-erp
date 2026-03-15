@@ -48,6 +48,7 @@ public class SalesOrderTools {
     }
 
     @Tool("创建销售订单。需要客户ID和商品明细。productSku(商品编码)很重要，用于关联商品库存。返回订单号和ID。")
+    @ToolName("创建销售订单")
     public String createSalesOrder(
             @P("客户ID，数字") Long customerId,
             @P("销售明细列表，JSON数组格式。每项包含：productSku(商品编码，必填), productName(商品名称), quantity(数量), unit(单位), unitPrice(单价)") String itemsJson,
@@ -148,6 +149,7 @@ public class SalesOrderTools {
     }
 
     @Tool("查询销售订单列表。支持按状态筛选和分页。")
+    @ToolName("查询销售订单")
     public String querySalesOrders(
             @P(value = "页码，从1开始，默认1", required = false) Integer pageNum,
             @P(value = "每页数量，默认10", required = false) Integer pageSize,
@@ -185,6 +187,7 @@ public class SalesOrderTools {
     }
 
     @Tool("获取销售订单详情。返回订单信息和明细列表。")
+    @ToolName("获取销售订单详情")
     public String getSalesOrderDetail(@P("订单ID") Long orderId) {
 
         try {
@@ -229,6 +232,7 @@ public class SalesOrderTools {
     }
 
     @Tool("确认销售订单。需要指定出库仓库。确认后会锁定库存。")
+    @ToolName("确认销售订单")
     public String confirmSalesOrder(
             @P("订单ID") Long orderId,
             @P("仓库ID，发货出库的仓库") Long warehouseId) {
@@ -252,6 +256,7 @@ public class SalesOrderTools {
     }
 
     @Tool("销售发货出库。需要仓库ID和发货明细。")
+    @ToolName("销售发货出库")
     public String shipGoods(
             @P("订单ID") Long orderId,
             @P("仓库ID") Long warehouseId,
@@ -293,6 +298,7 @@ public class SalesOrderTools {
     }
 
     @Tool("取消销售订单。只有草稿状态的订单可以取消。")
+    @ToolName("取消销售订单")
     public String cancelSalesOrder(@P("订单ID") Long orderId) {
 
         try {

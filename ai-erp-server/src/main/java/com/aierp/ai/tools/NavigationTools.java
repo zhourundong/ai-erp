@@ -77,6 +77,7 @@ public class NavigationTools {
     }
 
     @Tool("导航到指定页面。当用户要求打开某个页面、查看列表、浏览数据时使用。例如：'打开采购订单列表'、'查看库存'、'去商品管理'")
+    @ToolName("导航到页面")
     public String navigate(
         @P("目标页面: purchase-orders(采购订单), sales-orders(销售订单), inventory(库存), products(商品), suppliers(供应商), customers(客户), warehouses(仓库), purchase-requests(采购申请), dashboard(仪表盘)") String page,
         @P(value = "可选的过滤条件JSON，如 {\"status\":\"PENDING\"} 或 {\"keyword\":\"关键词\"}", required = false) String filter
@@ -98,6 +99,7 @@ public class NavigationTools {
     }
 
     @Tool("打开创建表单。当用户要求创建新记录、新增数据时使用。例如：'创建采购订单'、'新增商品'、'添加供应商'")
+    @ToolName("打开创建表单")
     public String openCreateForm(
         @P("表单类型: purchase-order(采购订单), sales-order(销售订单), product(商品), supplier(供应商), customer(客户), warehouse(仓库), purchase-request(采购申请)") String formType
     ) {
@@ -124,6 +126,7 @@ public class NavigationTools {
     }
 
     @Tool("打开详情页面。当用户要求查看某条记录的详细信息时使用。例如：'查看订单详情'、'显示商品信息'")
+    @ToolName("打开详情页面")
     public String openDetail(
         @P("记录类型: purchase-order(采购订单), sales-order(销售订单), product(商品), supplier(供应商), customer(客户)") String recordType,
         @P("记录ID，必须是有效的数字ID") Long recordId

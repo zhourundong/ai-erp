@@ -29,6 +29,7 @@ public class ProductTools {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Tool("创建商品。需要商品基本信息，SKU编码不填则自动生成。返回商品ID和SKU。")
+    @ToolName("创建商品")
     public String createProduct(
             @P(value = "商品SKU编码，不填则自动生成", required = false) String sku,
             @P("商品名称，必填") String name,
@@ -95,6 +96,7 @@ public class ProductTools {
     }
 
     @Tool("搜索商品。支持关键词搜索和分页。返回商品列表JSON。")
+    @ToolName("搜索商品")
     public String searchProducts(
             @P(value = "搜索关键词，可以是商品名称、SKU或品牌", required = false) String keyword,
             @P(value = "页码，从1开始，默认1", required = false) Integer pageNum,
@@ -142,6 +144,7 @@ public class ProductTools {
     }
 
     @Tool("根据SKU编码查询商品详情。返回商品完整信息JSON。")
+    @ToolName("根据SKU查询商品")
     public String getProductBySku(@P("商品SKU编码") String sku) {
 
         try {
@@ -183,6 +186,7 @@ public class ProductTools {
     }
 
     @Tool("根据ID查询商品详情。返回商品完整信息JSON。")
+    @ToolName("根据ID查询商品")
     public String getProductById(@P("商品ID") Long productId) {
 
         try {

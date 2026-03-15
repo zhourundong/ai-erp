@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware'
 // 工具执行记录
 export interface ToolExecution {
   name: string
+  chineseName?: string  // 中文名称
   arguments: Record<string, any>
   result: string
 }
@@ -98,7 +99,7 @@ export const useChatStore = create<ChatState>()(
           unreadCount: 0,
         }
         set((state) => ({
-          sessions: [newSession, ...state.sessions],
+          sessions: [...state.sessions, newSession],  // 新会话添加到末尾
           currentSessionId: sessionId,
         }))
         return sessionId
@@ -133,21 +134,25 @@ export const useChatStore = create<ChatState>()(
           content: message.content || '',
         }
 
-        set((state) => ({
-          sessions: state.sessions.map((session) =>
-            session.id === sessionId
-              ? {
-                  ...session,
-                  messages: [...session.messages, newMessage],
-                  updatedAt: new Date().toISOString(),
-                  title:
-                    session.messages.length === 0 && message.role === 'user'
-                      ? (message.content || '').slice(0, 20) + ((message.content || '').length > 20 ? '...' : '')
-                      : session.title,
-                }
-              : session
-          ),
-        }))
+        set((state) => {
+          // 找到当前会话，更新后移动到列表末尾
+          const currentSession = state.sessions.find(s => s.id === sessionId)
+          const otherSessions = state.sessions.filter(s => s.id !== sessionId)
+
+          const updatedSession = {
+            ...currentSession!,
+            messages: [...currentSession!.messages, newMessage],
+            updatedAt: new Date().toISOString(),
+            title:
+              currentSession!.messages.length === 0 && message.role === 'user'
+                ? (message.content || '').slice(0, 20) + ((message.content || '').length > 20 ? '...' : '')
+                : currentSession!.title,
+          }
+
+          return {
+            sessions: [...otherSessions, updatedSession]  // 更新的会话放到末尾
+          }
+        })
 
         return newMessage.id
       },

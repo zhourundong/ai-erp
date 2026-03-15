@@ -116,6 +116,9 @@
 /* 会话列表 */
 .session-list-float {
   padding: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .session-item-float {

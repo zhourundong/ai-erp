@@ -198,7 +198,7 @@ export const chatApi = {
     onError: (error: Error) => void,
     signal?: AbortSignal,
     onThinking?: (thinking: string) => void,
-    onTool?: (toolExecution: { name: string; arguments: Record<string, any>; result: string }) => void,
+    onTool?: (toolExecution: { name: string; chineseName?: string; arguments: Record<string, any>; result: string }) => void,
     onAction?: (action: ActionEvent) => void
   ) => {
     const eventSource = new EventSourcePolyfill('/api/chat/stream', {
@@ -230,6 +230,7 @@ export const chatApi = {
           // 转换为 ToolExecution 格式
           onTool({
             name: toolInfo.name,
+            chineseName: toolInfo.chineseName,
             arguments: toolInfo.arguments || {},
             result: typeof toolInfo.result === 'string' ? toolInfo.result : JSON.stringify(toolInfo.result)
           })

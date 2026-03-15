@@ -29,6 +29,7 @@ public class InventoryTools {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Tool("查询商品库存。可以按仓库和商品筛选。返回库存列表JSON。")
+    @ToolName("查询库存")
     public String checkInventory(
             @P(value = "仓库ID。不填则查询所有仓库", required = false) Long warehouseId,
             @P(value = "商品ID。不填则查询所有商品", required = false) Long productId,
@@ -76,6 +77,7 @@ public class InventoryTools {
     }
 
     @Tool("查询库存流水记录。支持按仓库、商品和交易类型筛选。返回流水列表JSON。")
+    @ToolName("查询库存流水")
     public String queryTransactions(
             @P(value = "仓库ID。不填则查询所有仓库", required = false) Long warehouseId,
             @P(value = "商品ID。不填则查询所有商品", required = false) Long productId,

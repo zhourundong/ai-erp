@@ -47,6 +47,7 @@ public class PurchaseOrderTools {
     }
 
     @Tool("创建采购订单。需要供应商ID和商品明细。productSku(商品编码)很重要，用于关联商品库存。返回订单号和ID。")
+    @ToolName("创建采购订单")
     public String createPurchaseOrder(
             @P("供应商ID，数字") Long supplierId,
             @P("采购明细列表，JSON数组格式。每项包含：productSku(商品编码，必填), productName(商品名称), quantity(数量), unit(单位), unitPrice(单价)") String itemsJson,
@@ -147,6 +148,7 @@ public class PurchaseOrderTools {
     }
 
     @Tool("查询采购订单列表。支持按状态筛选和分页。")
+    @ToolName("查询采购订单")
     public String queryPurchaseOrders(
             @P(value = "页码，从1开始，默认1", required = false) Integer pageNum,
             @P(value = "每页数量，默认10", required = false) Integer pageSize,
@@ -184,6 +186,7 @@ public class PurchaseOrderTools {
     }
 
     @Tool("获取采购订单详情。返回订单信息和明细列表。")
+    @ToolName("获取采购订单详情")
     public String getPurchaseOrderDetail(@P("订单ID") Long orderId) {
 
         try {
@@ -228,6 +231,7 @@ public class PurchaseOrderTools {
     }
 
     @Tool("提交采购订单审批。将草稿状态的订单提交审批。")
+    @ToolName("提交采购订单审批")
     public String submitOrderForApproval(@P("订单ID") Long orderId) {
 
         try {
@@ -249,6 +253,7 @@ public class PurchaseOrderTools {
     }
 
     @Tool("审批通过采购订单。")
+    @ToolName("审批通过采购订单")
     public String approvePurchaseOrder(@P("订单ID") Long orderId) {
 
         try {
@@ -270,6 +275,7 @@ public class PurchaseOrderTools {
     }
 
     @Tool("采购收货入库。需要仓库ID和收货明细。")
+    @ToolName("采购收货入库")
     public String receiveGoods(
             @P("订单ID") Long orderId,
             @P("仓库ID") Long warehouseId,

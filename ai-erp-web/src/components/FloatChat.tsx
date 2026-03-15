@@ -75,11 +75,14 @@ function formatDuration(ms: number | undefined): string {
 
 // 单个工具执行卡片
 function ToolCard({ tool }: { tool: ToolExecution }) {
+  // 优先显示中文名称
+  const displayName = tool.chineseName || tool.name
+
   return (
     <Card size="small" className="tool-card-inline">
       <div className="tool-header-inline">
         <ToolOutlined style={{ color: '#52c41a' }} />
-        <span className="tool-name">{tool.name}</span>
+        <span className="tool-name">{displayName}</span>
         <Tag color="success" icon={<CheckCircleOutlined />}>已执行</Tag>
       </div>
       <Collapse
@@ -197,17 +200,33 @@ function SessionList({
   sessions,
   currentSessionId,
   onSelect,
-  onDelete
+  onDelete,
+  showHistory
 }: {
   sessions: ChatSession[];
   currentSessionId: string | null;
   onSelect: (sessionId: string) => void;
   onDelete: (sessionId: string) => void;
+  showHistory: boolean;
 }) {
+  const listRef = useRef<HTMLDivElement>(null)
+
+  // 当历史面板打开时，滚动到最底部
+  useEffect(() => {
+    if (showHistory && listRef.current && sessions.length > 0) {
+      // 使用 setTimeout 确保 DOM 已渲染
+      setTimeout(() => {
+        if (listRef.current) {
+          listRef.current.scrollTop = listRef.current.scrollHeight
+        }
+      }, 50)
+    }
+  }, [showHistory, sessions])
+
   if (sessions.length === 0) return null
 
   return (
-    <div className="session-list-float">
+    <div className="session-list-float" ref={listRef}>
       {sessions.map((session) => (
         <div
           key={session.id}
@@ -271,6 +290,15 @@ export default function FloatChat() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // 打开聊天窗口时滚动到底部
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => {
+        scrollToBottom()
+      }, 100)
+    }
+  }, [open])
 
   useEffect(() => {
     const state = useChatStore.getState()
@@ -528,6 +556,7 @@ export default function FloatChat() {
               currentSessionId={currentSessionId}
               onSelect={handleSwitchSession}
               onDelete={handleDeleteSession}
+              showHistory={showHistory}
             />
           </div>
         )}

@@ -29,6 +29,7 @@ public class CustomerTools {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Tool("创建客户。需要客户基本信息。返回客户ID和编码。")
+    @ToolName("创建客户")
     public String createCustomer(
             @P("客户名称，必填") String name,
             @P(value = "客户简称", required = false) String shortName,
@@ -91,6 +92,7 @@ public class CustomerTools {
     }
 
     @Tool("搜索客户。支持关键词搜索和分页。返回客户列表JSON。")
+    @ToolName("搜索客户")
     public String searchCustomers(
             @P(value = "搜索关键词，可以是客户名称、编码或联系人", required = false) String keyword,
             @P(value = "页码，从1开始，默认1", required = false) Integer pageNum,
@@ -136,6 +138,7 @@ public class CustomerTools {
     }
 
     @Tool("获取客户详情。返回客户完整信息JSON，包括信用额度使用情况。")
+    @ToolName("获取客户详情")
     public String getCustomerDetail(@P("客户ID") Long customerId) {
 
         try {
@@ -179,6 +182,7 @@ public class CustomerTools {
     }
 
     @Tool("查询客户信用额度。返回客户信用额度、已用额度、可用额度等信息。")
+    @ToolName("查询客户信用额度")
     public String checkCustomerCredit(@P("客户ID") Long customerId) {
 
         try {
