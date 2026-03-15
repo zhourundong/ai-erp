@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: ai-erp-server
+
+  # SQLite Database Configuration
+  datasource:
+    url: jdbc:sqlite:./data/aierp.db
+    driver-class-name: org.sqlite.JDBC
+
+  # AI Model Configuration - 多模型可配置
+  ai:
+    models:
+      # 默认使用的模型
+      default: ${AI_DEFAULT_MODEL:openai}
+      claude:
+        enabled: ${CLAUDE_ENABLED:false}
+        api-key: ${ANTHROPIC_API_KEY:}
+        model: ${CLAUDE_MODEL:claude-sonnet-4-6-20250514}
+      openai:
+        enabled: ${OPENAI_ENABLED:true}
+        base-url: https://qianfan.baidubce.com/v2/coding
+        api-key: ${OPENAI_API_KEY:}
+        model: ${OPENAI_MODEL:glm-5}
+      # 预留：本地模型扩展点
+      local:
+        enabled: ${LOCAL_MODEL_ENABLED:false}
+        endpoint: ${LOCAL_MODEL_ENDPOINT:http://localhost:11434}
+        model: ${LOCAL_MODEL_NAME:}
+
+# MyBatis-Plus Configuration
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.aierp.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# Server Configuration
+server:
+  port: ${SERVER_PORT:8080}
+
+# Logging Configuration
+logging:
+  level:
+    com.aierp: DEBUG
+    dev.langchain4j: DEBUG
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:ai-erp-jwt-secret-key-for-development-only}
+  expiration: 86400000  # 24 hours
+
+# 扩展点配置 - 预留未来对接其他系统
+integration:
+  # 财务管理系统
+  finance:
+    enabled: false
+    endpoint: ${FINANCE_ENDPOINT:}
+  # 生产管理系统
+  production:
+    enabled: false
+    endpoint: ${PRODUCTION_ENDPOINT:}
+  # 仓储管理系统
+  wms:
+    enabled: false
+    endpoint: ${WMS_ENDPOINT:}
