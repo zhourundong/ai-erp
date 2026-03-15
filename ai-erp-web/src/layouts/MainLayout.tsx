@@ -1,28 +1,46 @@
-import { useState } from 'react'
-import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, Button, Space, Badge } from 'antd'
+import { useState, lazy, Suspense } from 'react'
+import { Layout, Menu, Avatar, Dropdown, Button, Tabs, Spin } from 'antd'
 import {
-  MessageOutlined,
   ShopOutlined,
   SettingOutlined,
-  BellOutlined,
   LogoutOutlined,
   UserOutlined,
   ShoppingOutlined,
   InboxOutlined,
   DollarOutlined,
   DatabaseOutlined,
+  HomeOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../stores/authStore'
+import { useTabStore, pageLabels } from '../stores/tabStore'
+import FloatChat from '../components/FloatChat'
 import './MainLayout.css'
 
 const { Header, Sider, Content } = Layout
 
+// 懒加载页面组件
+const pageComponents: Record<string, React.LazyExoticComponent<React.FC>> = {
+  '/': lazy(() => import('../pages/DashboardPage')),
+  '/users': lazy(() => import('../pages/UserManagePage')),
+  '/organizations': lazy(() => import('../pages/OrganizationPage')),
+  '/products': lazy(() => import('../pages/ProductPage')),
+  '/suppliers': lazy(() => import('../pages/SupplierPage')),
+  '/customers': lazy(() => import('../pages/CustomerPage')),
+  '/warehouses': lazy(() => import('../pages/WarehousePage')),
+  '/inventory': lazy(() => import('../pages/InventoryPage')),
+  '/inventory-transactions': lazy(() => import('../pages/InventoryTransactionPage')),
+  '/purchase-orders': lazy(() => import('../pages/PurchaseOrderPage')),
+  '/sales-orders': lazy(() => import('../pages/SalesOrderPage')),
+}
+
+// 菜单配置（包含 label 用于 Tab 显示）
 const menuItems = [
   {
-    key: '/chat',
-    icon: <MessageOutlined />,
-    label: 'AI对话',
+    key: '/',
+    icon: <HomeOutlined />,
+    label: '首页',
   },
   {
     key: 'procurement',
@@ -80,17 +98,29 @@ const menuItems = [
 
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false)
-  const navigate = useNavigate()
-  const location = useLocation()
   const { user, logout } = useAuthStore()
+  const { tabs, activeKey, openTab, closeTab, setActiveTab } = useTabStore()
 
+  // 处理菜单点击
   const handleMenuClick = ({ key }: { key: string }) => {
-    navigate(key)
+    if (key.startsWith('/')) {
+      openTab(key, pageLabels[key] || key)
+    }
+  }
+
+  // 处理 Tab 切换
+  const handleTabChange = (key: string) => {
+    setActiveTab(key)
+  }
+
+  // 处理 Tab 关闭
+  const handleTabClose = (targetKey: string) => {
+    closeTab(targetKey)
   }
 
   const handleLogout = () => {
     logout()
-    navigate('/login')
+    window.location.href = '/login'
   }
 
   const userMenuItems = [
@@ -118,30 +148,26 @@ export default function MainLayout() {
 
   // 获取当前选中的菜单项
   const getSelectedKeys = () => {
-    return [location.pathname]
+    return [activeKey]
   }
 
   // 获取默认展开的菜单组
   const getOpenKeys = () => {
-    const pathParts = location.pathname.split('/').filter(Boolean)
-    if (pathParts.length > 0) {
-      // 根据路径返回父菜单
-      const parentMenus: Record<string, string> = {
-        'purchase-orders': 'procurement',
-        'sales-orders': 'sales',
-        'customers': 'partners',
-        'suppliers': 'partners',
-        'inventory': 'inventory',
-        'inventory-transactions': 'inventory',
-        'warehouses': 'basic',
-        'products': 'basic',
-        'users': 'system',
-        'organizations': 'system',
-      }
-      const parent = parentMenus[pathParts[0]]
-      return parent ? [parent] : []
+    const parentMenus: Record<string, string> = {
+      'purchase-orders': 'procurement',
+      'sales-orders': 'sales',
+      'customers': 'partners',
+      'suppliers': 'partners',
+      'inventory': 'inventory',
+      'inventory-transactions': 'inventory',
+      'warehouses': 'basic',
+      'products': 'basic',
+      'users': 'system',
+      'organizations': 'system',
     }
-    return []
+    const key = activeKey.replace('/', '')
+    const parent = parentMenus[key]
+    return parent ? [parent] : []
   }
 
   return (
@@ -157,49 +183,82 @@ export default function MainLayout() {
           <span className="logo-icon">🤖</span>
           {!collapsed && <span className="logo-text">AI-ERP</span>}
         </div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={getSelectedKeys()}
-          defaultOpenKeys={getOpenKeys()}
-          items={menuItems}
-          onClick={handleMenuClick}
-        />
+        <div className="sider-menu-wrapper">
+          <Menu
+            theme="dark"
+            mode="inline"
+            selectedKeys={getSelectedKeys()}
+            defaultOpenKeys={getOpenKeys()}
+            items={menuItems}
+            onClick={handleMenuClick}
+          />
+        </div>
+        <div className="sider-footer">
+          <Button
+            type="text"
+            className="collapse-trigger"
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          </Button>
+        </div>
       </Sider>
-      <Layout>
+      <Layout className={collapsed ? 'ant-layout-has-sider-collapsed' : ''}>
         <Header className="main-header">
           <div className="header-left">
-            <Button
-              type="text"
-              className="trigger"
-              onClick={() => setCollapsed(!collapsed)}
-            >
-              <span className="trigger-icon">{collapsed ? '→' : '←'}</span>
-            </Button>
+            {/* 标题或面包屑 */}
           </div>
           <div className="header-right">
-            <Space size={16}>
-              <Badge count={3} size="small">
-                <Button type="text" icon={<BellOutlined />} className="header-icon" />
-              </Badge>
-              <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-                <div className="user-info">
-                  <Avatar
-                    style={{ backgroundColor: '#667eea' }}
-                    icon={<UserOutlined />}
-                  >
-                    {user?.realName?.[0] || user?.username?.[0]}
-                  </Avatar>
-                  <span className="user-name">{user?.realName || user?.username}</span>
-                </div>
-              </Dropdown>
-            </Space>
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+              <div className="user-info">
+                <Avatar
+                  style={{ backgroundColor: '#667eea' }}
+                  icon={<UserOutlined />}
+                >
+                  {user?.realName?.[0] || user?.username?.[0]}
+                </Avatar>
+                <span className="user-name">{user?.realName || user?.username}</span>
+              </div>
+            </Dropdown>
           </div>
         </Header>
         <Content className="main-content">
-          <Outlet />
+          {/* Tab 页签区域 */}
+          <Tabs
+            type="editable-card"
+            hideAdd
+            activeKey={activeKey}
+            onChange={handleTabChange}
+            onEdit={(targetKey, action) => {
+              if (action === 'remove') {
+                handleTabClose(targetKey as string)
+              }
+            }}
+            items={tabs.map(tab => ({
+              key: tab.key,
+              label: tab.label,
+              closable: tab.closable,
+              children: (
+                <Suspense
+                  fallback={
+                    <div className="page-loading">
+                      <Spin size="large" />
+                    </div>
+                  }
+                >
+                  {(() => {
+                    const PageComponent = pageComponents[tab.key]
+                    return PageComponent ? <PageComponent /> : <div>页面不存在</div>
+                  })()}
+                </Suspense>
+              )
+            }))}
+            className="main-tabs"
+          />
         </Content>
       </Layout>
+      {/* 悬浮聊天窗口 */}
+      <FloatChat />
     </Layout>
   )
 }

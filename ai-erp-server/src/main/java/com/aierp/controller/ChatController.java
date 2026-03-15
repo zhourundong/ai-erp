@@ -3,6 +3,7 @@ package com.aierp.controller;
 import com.aierp.agent.AgentOrchestrator;
 import com.aierp.ai.dto.ChatRequest;
 import com.aierp.ai.dto.ChatResponse;
+import com.aierp.ai.dto.NavigationResult;
 import com.aierp.context.UserContext;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -202,6 +203,21 @@ public class ChatController {
                             log.warn("发送tool事件失败: {}", e.getMessage());
                         } catch (IllegalStateException e) {
                             log.warn("Emitter已完成，无法发送tool: {}", e.getMessage());
+                        }
+                    }
+
+                    @Override
+                    public void onAction(NavigationResult action) {
+                        if (isCompleted[0]) return;
+                        try {
+                            log.info("发送action事件: action={}, path={}", action.getAction(), action.getPath());
+                            emitter.send(SseEmitter.event()
+                                    .name("action")
+                                    .data(action));
+                        } catch (IOException e) {
+                            log.warn("发送action事件失败: {}", e.getMessage());
+                        } catch (IllegalStateException e) {
+                            log.warn("Emitter已完成，无法发送action: {}", e.getMessage());
                         }
                     }
                 });

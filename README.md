@@ -4,7 +4,7 @@
 
 ![AI-ERP Logo](https://img.shields.io/badge/AI--ERP-v0.0.1-blue)
 ![Java](https://img.shields.io/badge/Java-17-orange)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.3-brightgreen)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.11-brightgreen)
 ![React](https://img.shields.io/badge/React-18.2-61dafb)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3-3178c6)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -35,31 +35,56 @@ AI-ERP是一个**AI原生**的企业资源规划系统，将AI能力深度融入
 
 ## 功能特性
 
-### 🤖 AI核心能力
+### AI核心能力
 
 - **自然语言交互** - 通过对话完成所有业务操作
-- **意图智能识别** - 自动理解用户需求并规划执行
-- **多模型支持** - 支持Claude、OpenAI等主流AI模型
-- **Skills渐进式加载** - 按需加载AI技能，优化性能
+- **流式响应 (SSE)** - 实时返回AI思考过程和回复，支持长任务处理
 - **工具智能调用** - AI可调用业务工具完成复杂任务
+- **多模型支持** - 支持 Claude、OpenAI 等主流 AI 模型（基于 LangChain4j）
+- **会话记忆** - 支持多会话上下文记忆
 
-### 📦 采购供应链模块
+### 采购供应链模块
 
-- **智能采购申请** - 自然语言描述需求，AI自动生成结构化申请
-- **供应商智能推荐** - 基于历史数据多维度推荐最优供应商
-- **采购订单管理** - 全流程跟踪，AI风险预警
-- **审批流程** - 可配置的审批流程，支持移动端
+- **采购申请** - 创建、查询、审批采购申请
+- **采购订单** - 创建订单、提交审批、审批通过、收货入库
+- **供应商管理** - 供应商信息维护
 
-### 👥 组织用户管理
+### 销售管理模块
+
+- **销售订单** - 创建订单、确认（锁定库存）、发货出库、取消订单
+- **客户管理** - 客户信息维护、信用额度管理
+
+### 库存管理模块
+
+- **库存查询** - 实时库存数量、可用库存
+- **库存事务** - 入库、出库、调拨记录
+
+### 基础数据管理
+
+- **商品管理** - 商品信息、SKU编码、分类管理
+- **仓库管理** - 仓库信息维护
+
+### 组织用户管理
 
 - **用户管理** - 支持多角色权限控制
 - **组织架构** - 树形组织结构管理
 - **认证授权** - JWT Token认证
 
-### 📊 数据分析
+---
 
-- **对话式查询** - 自然语言查询业务数据
-- **智能洞察** - AI自动分析数据并生成洞察报告
+## AI工具清单
+
+AI助手可通过以下工具执行业务操作：
+
+| 工具类 | 功能说明 |
+|-------|---------|
+| **PurchaseOrderTools** | 创建/查询采购订单、提交审批、审批通过、收货入库 |
+| **SalesOrderTools** | 创建/查询销售订单、确认订单、发货出库、取消订单 |
+| **InventoryTools** | 查询库存数量、可用库存、库存事务 |
+| **ProductTools** | 查询商品信息、按SKU查询、商品列表 |
+| **SupplierTools** | 查询供应商信息、供应商列表 |
+| **CustomerTools** | 查询客户信息、客户列表、信用额度 |
+| **WarehouseTools** | 查询仓库信息、仓库列表 |
 
 ---
 
@@ -85,8 +110,9 @@ cd ai-erp
 ```bash
 cd ai-erp-server
 
-# 配置AI模型API Key（可选，不配置可使用Mock模式）
+# 配置AI模型API Key（必需）
 export ANTHROPIC_API_KEY=your-claude-api-key
+# 或
 export OPENAI_API_KEY=your-openai-api-key
 
 # 启动服务
@@ -127,22 +153,24 @@ npm run dev
 │                    前端层 (React + TypeScript)                │
 │         对话式界面 + 传统管理界面 + 数据可视化                  │
 └──────────────────────────┬──────────────────────────────────┘
-                           │ REST API / SSE
+                           │ REST API / SSE (流式)
 ┌──────────────────────────┴──────────────────────────────────┐
-│                 后端层 (Spring Boot 3.x 单体应用)             │
+│                 后端层 (Spring Boot 3.5.11 单体应用)           │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │                   Controller 层                       │    │
-│  └─────────────────────────────────────────────────────┘    │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │                    Service 层                         │    │
+│  │   ChatController(AuthController/XXXController...)    │    │
 │  └─────────────────────────────────────────────────────┘    │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │                 AI Agent 编排层                       │    │
-│  │   AgentOrchestrator │ IntentClassifier │ TaskPlanner │    │
+│  │            AgentOrchestrator + ErpAssistant          │    │
 │  └─────────────────────────────────────────────────────┘    │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │                  AI 服务适配层                        │    │
-│  │         ClaudeAdapter │ OpenAIAdapter │ ModelFactory │    │
+│  │                  AI 工具层                           │    │
+│  │   PurchaseOrderTools/SalesOrderTools/InventoryTools  │    │
+│  │   ProductTools/SupplierTools/CustomerTools/...       │    │
+│  └─────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │                    Service 层                         │    │
 │  └─────────────────────────────────────────────────────┘    │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │               数据访问层 (MyBatis-Plus)               │    │
@@ -156,17 +184,17 @@ npm run dev
 
 ### 技术选型
 
-| 层级 | 技术 | 说明 |
-|-----|------|------|
-| 前端框架 | React 18 + TypeScript | 现代化前端开发栈 |
-| UI组件 | Ant Design 5 | 企业级UI组件库 |
-| 状态管理 | Zustand | 轻量级状态管理 |
-| 构建工具 | Vite | 快速构建工具 |
-| 后端框架 | Spring Boot 3.x | 主流企业级Java框架 |
-| ORM | MyBatis-Plus | 强大的MyBatis增强工具 |
-| 数据库 | SQLite | 轻量级嵌入式数据库 |
-| AI集成 | LangChain4j | AI应用开发框架 |
-| 认证 | Spring Security + JWT | 用户认证和授权 |
+| 层级 | 技术 | 版本 | 说明 |
+|-----|------|------|------|
+| 前端框架 | React + TypeScript | 18.2 | 现代化前端开发栈 |
+| UI组件 | Ant Design | 5.x | 企业级UI组件库 |
+| 状态管理 | Zustand | - | 轻量级状态管理 |
+| 构建工具 | Vite | - | 快速构建工具 |
+| 后端框架 | Spring Boot | 3.5.11 | 主流企业级Java框架 |
+| ORM | MyBatis-Plus | 3.5.5 | 强大的MyBatis增强工具 |
+| 数据库 | SQLite | 3.45.1 | 轻量级嵌入式数据库 |
+| AI集成 | LangChain4j | 1.12.2 | AI应用开发框架 |
+| 认证 | Spring Security + JWT | 0.12.5 | 用户认证和授权 |
 
 ---
 
@@ -178,35 +206,47 @@ ai-erp/
 │   ├── src/main/java/com/aierp/
 │   │   ├── AiErpApplication.java     # 启动类
 │   │   ├── config/                   # 配置类
-│   │   │   ├── MybatisPlusConfig.java
-│   │   │   ├── SecurityConfig.java
-│   │   │   ├── AiModelConfig.java
-│   │   │   └── JwtConfig.java
+│   │   │   ├── AiModelConfig.java    # AI模型配置
+│   │   │   ├── AiServiceConfig.java  # AI服务配置
+│   │   │   ├── SecurityConfig.java   # 安全配置
+│   │   │   └── JwtConfig.java        # JWT配置
 │   │   ├── controller/               # 控制器
-│   │   │   ├── AuthController.java
-│   │   │   ├── ChatController.java
-│   │   │   ├── UserController.java
+│   │   │   ├── AuthController.java   # 认证
+│   │   │   ├── ChatController.java   # AI对话
+│   │   │   ├── PurchaseOrderController.java
+│   │   │   ├── SalesOrderController.java
+│   │   │   ├── InventoryController.java
+│   │   │   ├── ProductController.java
 │   │   │   ├── SupplierController.java
-│   │   │   └── PurchaseRequestController.java
+│   │   │   ├── CustomerController.java
+│   │   │   └── WarehouseController.java
 │   │   ├── service/                  # 业务服务
-│   │   ├── mapper/                   # MyBatis Mapper
-│   │   ├── entity/                   # 实体类
+│   │   │   ├── PurchaseOrderService.java
+│   │   │   ├── SalesOrderService.java
+│   │   │   ├── InventoryService.java
+│   │   │   └── ...
+│   │   ├── ai/                       # AI服务
+│   │   │   ├── ErpAssistant.java     # AI助手接口
+│   │   │   ├── dto/                  # AI DTO
+│   │   │   └── tools/                # AI工具
+│   │   │       ├── PurchaseOrderTools.java
+│   │   │       ├── SalesOrderTools.java
+│   │   │       ├── InventoryTools.java
+│   │   │       ├── ProductTools.java
+│   │   │       ├── SupplierTools.java
+│   │   │       ├── CustomerTools.java
+│   │   │       └── WarehouseTools.java
 │   │   ├── agent/                    # AI Agent编排
-│   │   │   ├── AgentOrchestrator.java
-│   │   │   ├── IntentClassifier.java
-│   │   │   └── TaskPlanner.java
-│   │   ├── ai/                       # AI服务适配
-│   │   │   ├── ModelAdapter.java
-│   │   │   ├── ModelFactory.java
-│   │   │   └── adapter/
-│   │   │       ├── ClaudeAdapter.java
-│   │   │       └── OpenAIAdapter.java
+│   │   │   └── AgentOrchestrator.java
+│   │   ├── entity/                   # 实体类
+│   │   ├── mapper/                   # MyBatis Mapper
 │   │   ├── dto/                      # DTO对象
-│   │   └── common/                   # 通用工具
+│   │   ├── common/                   # 通用工具
+│   │   └── context/                  # 上下文
+│   │       └── UserContext.java
 │   ├── src/main/resources/
-│   │   ├── application.yml           # 主配置
-│   │   └── application-dev.yml       # 开发配置
-│   ├── src/test/                     # 单元测试
+│   │   └── application.yml           # 主配置
+│   ├── src/test/                     # 单元测试 (17个测试文件)
 │   └── pom.xml
 │
 ├── ai-erp-web/                       # 前端应用
@@ -214,19 +254,25 @@ ai-erp/
 │   │   ├── main.tsx                  # 入口文件
 │   │   ├── App.tsx                   # 根组件
 │   │   ├── pages/                    # 页面组件
-│   │   │   ├── LoginPage.tsx
-│   │   │   ├── ChatPage.tsx
-│   │   │   ├── UserManagePage.tsx
-│   │   │   ├── OrganizationPage.tsx
+│   │   │   ├── LoginPage.tsx         # 登录页
+│   │   │   ├── ChatPage.tsx          # AI对话页
+│   │   │   ├── PurchaseRequestPage.tsx
+│   │   │   ├── PurchaseOrderPage.tsx
+│   │   │   ├── SalesOrderPage.tsx
+│   │   │   ├── InventoryPage.tsx
+│   │   │   ├── InventoryTransactionPage.tsx
+│   │   │   ├── ProductPage.tsx
 │   │   │   ├── SupplierPage.tsx
-│   │   │   └── PurchaseRequestPage.tsx
+│   │   │   ├── CustomerPage.tsx
+│   │   │   ├── WarehousePage.tsx
+│   │   │   ├── UserManagePage.tsx
+│   │   │   └── OrganizationPage.tsx
 │   │   ├── layouts/                  # 布局组件
 │   │   ├── components/               # 通用组件
 │   │   ├── stores/                   # 状态管理
 │   │   ├── services/                 # API服务
 │   │   └── types/                    # TypeScript类型
-│   ├── package.json
-│   └── vite.config.ts
+│   └── package.json
 │
 ├── docs/                             # 文档
 │   └── architecture.md               # 架构设计文档
@@ -254,16 +300,14 @@ spring:
     driver-class-name: org.sqlite.JDBC
 
 # AI模型配置
-spring:
-  ai:
-    models:
-      default: claude
-      claude:
-        api-key: ${ANTHROPIC_API_KEY:}
-        model: claude-sonnet-4-6-20250514
-      openai:
-        api-key: ${OPENAI_API_KEY:}
-        model: gpt-4o
+ai:
+  model: claude  # 或 openai
+  claude:
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: claude-sonnet-4-6-20250514
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    model: gpt-4o
 
 # JWT配置
 jwt:
@@ -314,16 +358,25 @@ Content-Type: application/json
 
 ### AI对话接口
 
+#### 流式对话（推荐）
+
 ```http
-POST /api/chat
+POST /api/chat/stream
 Authorization: Bearer {token}
 Content-Type: application/json
 
 {
-  "message": "帮我创建一个采购申请，需要100个M8螺丝",
-  "sessionId": "optional-session-id"
+  "message": "帮我创建一个采购订单，供应商ID是1，商品是M8螺丝100个",
+  "sessionId": "session-123"
 }
 ```
+
+响应格式 (SSE):
+- `event: thinking` - AI思考过程
+- `event: token` - 响应文本片段
+- `event: tool` - 工具执行信息
+- `event: complete` - 完成事件
+- `event: error` - 错误事件
 
 ### 业务接口
 
@@ -332,9 +385,14 @@ Content-Type: application/json
 | GET | /api/users | 用户列表 |
 | POST | /api/users | 创建用户 |
 | GET | /api/suppliers | 供应商列表 |
-| POST | /api/suppliers/recommend | AI推荐供应商 |
-| GET | /api/purchase/requests | 采购申请列表 |
-| POST | /api/purchase/requests | 创建采购申请 |
+| GET | /api/customers | 客户列表 |
+| GET | /api/products | 商品列表 |
+| GET | /api/warehouses | 仓库列表 |
+| GET | /api/inventory | 库存列表 |
+| GET | /api/purchase/orders | 采购订单列表 |
+| POST | /api/purchase/orders | 创建采购订单 |
+| GET | /api/sales/orders | 销售订单列表 |
+| POST | /api/sales/orders | 创建销售订单 |
 
 ---
 
@@ -345,7 +403,8 @@ Content-Type: application/json
 ```bash
 # 后端测试
 cd ai-erp-server
-mvn test
+mvn test                         # 运行所有测试
+mvn test -Dtest=PurchaseOrderServiceTest  # 运行单个测试类
 
 # 前端测试
 cd ai-erp-web
@@ -369,22 +428,26 @@ npm run test
 
 ## 路线图
 
-### v0.1.0 (MVP) ✅
+### v0.1.0 (MVP)
 
 - [x] 用户登录认证
-- [x] AI对话交互
-- [x] 采购申请基础功能
+- [x] AI对话交互（流式响应）
+- [x] 采购订单管理（创建、审批、收货）
+- [x] 销售订单管理（创建、确认、发货）
+- [x] 库存管理
+- [x] 商品管理
 - [x] 供应商管理
+- [x] 客户管理
+- [x] 仓库管理
 - [x] 用户管理
 - [x] 组织管理
 
 ### v0.2.0 (计划中)
 
-- [ ] 流式对话响应
-- [ ] Skills渐进式加载
-- [ ] 工具调用可视化
+- [ ] 工具调用可视化优化
 - [ ] 发票OCR识别
 - [ ] 合同智能审核
+- [ ] 多会话管理
 
 ### v0.3.0 (规划中)
 
@@ -423,8 +486,8 @@ npm run test
 
 <div align="center">
 
-**⭐ 如果这个项目对你有帮助，请给一个Star支持一下！ ⭐**
+**如果这个项目对你有帮助，请给一个Star支持一下！**
 
-Made with ❤️ by AI-ERP Team
+Made with love by AI-ERP Team
 
 </div>

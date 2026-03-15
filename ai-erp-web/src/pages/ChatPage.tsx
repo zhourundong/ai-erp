@@ -1,11 +1,12 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { Input, Button, Avatar, Spin, Card, Tag, Space, Popconfirm, Collapse } from 'antd'
-import { SendOutlined, RobotOutlined, UserOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, StopOutlined, BulbOutlined, ToolOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { SendOutlined, RobotOutlined, UserOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, StopOutlined, BulbOutlined, ToolOutlined, CheckCircleOutlined, ExportOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { chatApi } from '../services/api'
+import { chatApi, ActionEvent } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
 import { useChatStore, StreamEvent, ToolExecution } from '../stores/chatStore'
+import { useTabStore } from '../stores/tabStore'
 import './ChatPage.css'
 
 // 存储当前请求的 AbortController
@@ -62,8 +63,29 @@ function ToolCard({ tool }: { tool: ToolExecution }) {
   )
 }
 
+// 导航动作卡片
+function ActionCard({ action, onExecute }: { action: ActionEvent; onExecute: () => void }) {
+  return (
+    <Card size="small" className="action-card" style={{ marginTop: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ExportOutlined style={{ color: '#1890ff' }} />
+          <span>{action.description || '导航到目标页面'}</span>
+        </div>
+        <Button type="primary" size="small" onClick={onExecute}>
+          {action.confirmText || '前往'}
+        </Button>
+      </div>
+    </Card>
+  )
+}
+
 // 渲染流式事件列表（按顺序）
-function StreamEventsDisplay({ events, isLoading }: { events: StreamEvent[]; isLoading?: boolean }) {
+function StreamEventsDisplay({ events, isLoading, onAction }: {
+  events: StreamEvent[];
+  isLoading?: boolean;
+  onAction?: (action: ActionEvent) => void
+}) {
   if (!events || events.length === 0) return null
 
   return (
@@ -71,6 +93,14 @@ function StreamEventsDisplay({ events, isLoading }: { events: StreamEvent[]; isL
       {events.map((event, index) => {
         if (event.type === 'tool' && event.tool) {
           return <ToolCard key={`tool-${index}`} tool={event.tool} />
+        } else if (event.type === 'action' && event.action) {
+          return (
+            <ActionCard
+              key={`action-${index}`}
+              action={event.action}
+              onExecute={() => onAction?.(event.action!)}
+            />
+          )
         } else if (event.type === 'text' && event.content) {
           return (
             <ReactMarkdown key={`text-${index}`} remarkPlugins={[remarkGfm]}>
@@ -124,6 +154,7 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user } = useAuthStore()
+  const { openTabByPath, openCreateForm } = useTabStore()
   const {
     sessions,
     currentSessionId,
@@ -157,6 +188,17 @@ export default function ChatPage() {
     }, 0)
     return () => clearTimeout(timer)
   }, [])
+
+  // 执行导航动作
+  const executeAction = useCallback((action: ActionEvent) => {
+    if (action.action === 'openCreateForm' && action.path) {
+      // 解析路径，去掉 ?create=true 参数，获取 basePath
+      const basePath = action.path.split('?')[0]
+      openCreateForm(basePath, action.formType)
+    } else if (action.path) {
+      openTabByPath(action.path)
+    }
+  }, []) // 依赖为空，openCreateForm 和 openTabByPath 是 zustand store 的稳定函数
 
   const handleSend = async () => {
     const input = inputValue.trim()
@@ -237,6 +279,14 @@ export default function ChatPage() {
       // onTool
       (toolExecution: ToolExecution) => {
         store.appendToolToMessage(sessionId, loadingMsgId, toolExecution)
+      },
+      // onAction
+      (action: ActionEvent) => {
+        store.appendActionToMessage(sessionId, loadingMsgId, action)
+        // 如果不需要确认，自动执行导航
+        if (!action.requiresConfirmation) {
+          executeAction(action)
+        }
       }
     )
   }
@@ -378,7 +428,11 @@ export default function ChatPage() {
 
                       {/* 流式事件（文字+工具按顺序） */}
                       {message.events && message.events.length > 0 ? (
-                        <StreamEventsDisplay events={message.events} isLoading={message.loading} />
+                        <StreamEventsDisplay
+                          events={message.events}
+                          isLoading={message.loading}
+                          onAction={executeAction}
+                        />
                       ) : (
                         <div className="message-text">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>

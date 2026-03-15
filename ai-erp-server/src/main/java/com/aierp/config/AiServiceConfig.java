@@ -3,6 +3,7 @@ package com.aierp.config;
 import com.aierp.ai.ErpAssistant;
 import com.aierp.ai.tools.CustomerTools;
 import com.aierp.ai.tools.InventoryTools;
+import com.aierp.ai.tools.NavigationTools;
 import com.aierp.ai.tools.ProductTools;
 import com.aierp.ai.tools.PurchaseOrderTools;
 import com.aierp.ai.tools.SalesOrderTools;
@@ -43,6 +44,7 @@ public class AiServiceConfig {
     private final InventoryTools inventoryTools;
     private final ProductTools productTools;
     private final WarehouseTools warehouseTools;
+    private final NavigationTools navigationTools;
 
     /**
      * 创建 ERP 智能助手 AI Service
@@ -63,7 +65,7 @@ public class AiServiceConfig {
 
         return AiServices.builder(ErpAssistant.class)
                 .streamingChatModel(model)
-                .tools(purchaseOrderTools, salesOrderTools, supplierTools, customerTools, inventoryTools, productTools, warehouseTools)
+                .tools(purchaseOrderTools, salesOrderTools, supplierTools, customerTools, inventoryTools, productTools, warehouseTools, navigationTools)
                 .chatMemoryProvider(sessionId -> MessageWindowChatMemory.withMaxMessages(20))
                 .build();
     }

@@ -1,0 +1,156 @@
+.dashboard-page {
+  padding: 16px;
+}
+
+.dashboard-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 400px;
+}
+
+/* 统计卡片 */
+.stat-card {
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.stat-card .ant-statistic-title {
+  font-size: 14px;
+  color: #666;
+}
+
+.stat-card .ant-statistic-content {
+  font-size: 28px;
+}
+
+.stat-footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+  font-size: 12px;
+  color: #999;
+}
+
+/* 区块卡片 */
+.section-card {
+  border-radius: 12px;
+  margin-top: 16px;
+}
+
+.section-card .ant-card-head-title {
+  font-weight: 600;
+}
+
+/* 待办事项 */
+.todo-card {
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
+}
+
+.todo-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.todo-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.todo-info {
+  flex: 1;
+}
+
+.todo-label {
+  font-size: 14px;
+  color: #666;
+}
+
+.todo-count {
+  font-size: 28px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* 状态列表 */
+.status-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.status-count {
+  font-weight: 600;
+  color: #333;
+}
+
+/* 快捷入口 */
+.quick-card {
+  text-align: center;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.quick-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+  border-color: #667eea;
+}
+
+.quick-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.quick-label {
+  font-size: 14px;
+  color: #333;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .dashboard-page {
+    padding: 8px;
+  }
+
+  .stat-card .ant-statistic-content {
+    font-size: 24px;
+  }
+
+  .todo-content {
+    gap: 12px;
+  }
+
+  .todo-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+
+  .todo-count {
+    font-size: 24px;
+  }
+}

@@ -3,6 +3,7 @@ import { Table, Card, Button, Space, Tag, Modal, Form, Input, Select, message, P
 import { PlusOutlined, EyeOutlined, CheckOutlined, CloseOutlined, ImportOutlined, MinusOutlined, EditOutlined } from '@ant-design/icons'
 import { purchaseOrderApi, supplierApi, warehouseApi, productApi } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
+import { useTabStore } from '../stores/tabStore'
 import type { ColumnsType } from 'antd/es/table'
 
 interface PurchaseOrder {
@@ -64,6 +65,7 @@ interface OrderItemInput {
 
 export default function PurchaseOrderPage() {
   const { user } = useAuthStore()
+  const { consumePendingDetail, detailVersion } = useTabStore()
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<PurchaseOrder[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -129,6 +131,38 @@ export default function PurchaseOrderPage() {
     fetchWarehouses()
     fetchProducts()
   }, [pageNum, pageSize])
+
+  // 处理待打开的详情或创建表单（从 AI 助手导航过来）
+  useEffect(() => {
+    const pendingDetail = consumePendingDetail()
+    if (pendingDetail && pendingDetail.basePath === '/purchase-orders') {
+      if (pendingDetail.type === 'create') {
+        // 打开创建表单
+        handleAdd()
+      } else if (pendingDetail.type === 'view' && pendingDetail.id) {
+        // 查看详情
+        const orderId = parseInt(pendingDetail.id)
+        if (!isNaN(orderId)) {
+          // 先尝试从列表中查找
+          const order = data.find(o => o.id === orderId)
+          if (order) {
+            handleViewDetail(order)
+          } else {
+            // 列表中没有，从 API 获取
+            purchaseOrderApi.get(orderId).then((response: any) => {
+              if (response.data) {
+                handleViewDetail(response.data)
+              } else {
+                message.warning('未找到该订单')
+              }
+            }).catch(() => {
+              message.error('获取订单详情失败')
+            })
+          }
+        }
+      }
+    }
+  }, [detailVersion, data])
 
   const handleAdd = () => {
     form.resetFields()

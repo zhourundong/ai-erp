@@ -1,5 +1,8 @@
 package com.aierp.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
 import dev.langchain4j.model.anthropic.AnthropicStreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
@@ -10,10 +13,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Duration;
+import java.util.Map;
 
 /**
  * AI模型配置类
- *
+ * <p>
  * 支持多模型切换：
  * - Claude (Anthropic)
  * - OpenAI (GPT)
@@ -105,9 +109,10 @@ public class AiModelConfig {
                 .apiKey(openAiApiKey)
                 .modelName(openAiModel)
                 .timeout(Duration.ofSeconds(120))
-                .returnThinking(true)  // 支持 reasoning_content
+//                    .returnThinking(true)  // 支持 reasoning_content
                 .logRequests(true)
                 .logResponses(true)
+                .customParameters(Map.of("thinking", Map.of("type", "disable")))
                 .build();
     }
 }

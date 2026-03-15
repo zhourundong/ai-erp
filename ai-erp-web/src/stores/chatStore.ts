@@ -8,11 +8,25 @@ export interface ToolExecution {
   result: string
 }
 
+// 导航动作事件
+export interface ActionEvent {
+  action: 'navigate' | 'openCreateForm' | 'openModal'
+  path?: string
+  filter?: Record<string, any>
+  formType?: string
+  recordType?: string
+  recordId?: number
+  requiresConfirmation: boolean
+  confirmText?: string
+  description?: string
+}
+
 // 流式事件 - 按顺序存储
 export interface StreamEvent {
-  type: 'text' | 'tool'  // 文字或工具调用
+  type: 'text' | 'tool' | 'action'  // 文字、工具调用或导航动作
   content?: string       // 文字内容（type='text'时）
   tool?: ToolExecution   // 工具信息（type='tool'时）
+  action?: ActionEvent   // 导航动作（type='action'时）
 }
 
 export interface Message {
@@ -34,12 +48,14 @@ export interface ChatSession {
   messages: Message[]
   createdAt: string
   updatedAt: string
+  unreadCount: number  // 未读消息数
 }
 
 interface ChatState {
   sessions: ChatSession[]
   currentSessionId: string | null
   pendingRequests: Map<string, { sessionId: string; messageId: string }>
+  chatOpen: boolean  // 聊天窗口是否打开
 
   createSession: () => string
   getCurrentSession: () => ChatSession | null
@@ -51,12 +67,16 @@ interface ChatState {
   updateMessageInSession: (sessionId: string, messageId: string, updates: Partial<Message>) => void
   appendTextToMessage: (sessionId: string, messageId: string, text: string) => void
   appendToolToMessage: (sessionId: string, messageId: string, tool: ToolExecution) => void
+  appendActionToMessage: (sessionId: string, messageId: string, action: ActionEvent) => void
   registerPendingRequest: (messageId: string, sessionId: string) => void
   cancelPendingRequest: (messageId: string) => void
   getPendingRequest: (messageId: string) => { sessionId: string; messageId: string } | undefined
   deleteSession: (sessionId: string) => void
   clearCurrentSession: () => void
   updateSessionTitle: (sessionId: string, title: string) => void
+  setChatOpen: (open: boolean) => void
+  markCurrentSessionAsRead: () => void
+  getTotalUnreadCount: () => number
 }
 
 export const useChatStore = create<ChatState>()(
@@ -65,6 +85,7 @@ export const useChatStore = create<ChatState>()(
       sessions: [],
       currentSessionId: null,
       pendingRequests: new Map(),
+      chatOpen: false,
 
       createSession: () => {
         const sessionId = `session_${Date.now()}`
@@ -74,6 +95,7 @@ export const useChatStore = create<ChatState>()(
           messages: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          unreadCount: 0,
         }
         set((state) => ({
           sessions: [newSession, ...state.sessions],
@@ -137,18 +159,38 @@ export const useChatStore = create<ChatState>()(
       },
 
       updateMessageInSession: (sessionId, messageId, updates) => {
-        set((state) => ({
-          sessions: state.sessions.map((session) =>
-            session.id === sessionId
-              ? {
-                  ...session,
-                  messages: session.messages.map((msg) =>
-                    msg.id === messageId ? { ...msg, ...updates } : msg
-                  ),
-                }
-              : session
-          ),
-        }))
+        const { chatOpen } = get()
+
+        set((state) => {
+          // 查找当前消息
+          const session = state.sessions.find(s => s.id === sessionId)
+          const message = session?.messages.find(m => m.id === messageId)
+
+          // 检查是否是 AI 回复完成（loading 从 true 变为 false）
+          const isAIResponseComplete =
+            message?.role === 'assistant' &&
+            message?.loading === true &&
+            updates.loading === false
+
+          // 如果聊天窗口关闭且是 AI 回复完成，增加未读计数
+          const shouldIncreaseUnread = !chatOpen && isAIResponseComplete
+
+          return {
+            sessions: state.sessions.map((session) =>
+              session.id === sessionId
+                ? {
+                    ...session,
+                    messages: session.messages.map((msg) =>
+                      msg.id === messageId ? { ...msg, ...updates } : msg
+                    ),
+                    unreadCount: shouldIncreaseUnread
+                      ? (session.unreadCount || 0) + 1
+                      : (session.unreadCount || 0),
+                  }
+                : session
+            ),
+          }
+        })
       },
 
       // 追加文字到消息（流式）
@@ -193,6 +235,25 @@ export const useChatStore = create<ChatState>()(
                     if (msg.id !== messageId) return msg
                     const events = [...(msg.events || [])]
                     events.push({ type: 'tool', tool })
+                    return { ...msg, events }
+                  }),
+                }
+              : session
+          ),
+        }))
+      },
+
+      // 追加导航动作到消息（流式）
+      appendActionToMessage: (sessionId, messageId, action) => {
+        set((state) => ({
+          sessions: state.sessions.map((session) =>
+            session.id === sessionId
+              ? {
+                  ...session,
+                  messages: session.messages.map((msg) => {
+                    if (msg.id !== messageId) return msg
+                    const events = [...(msg.events || [])]
+                    events.push({ type: 'action', action })
                     return { ...msg, events }
                   }),
                 }
@@ -252,6 +313,36 @@ export const useChatStore = create<ChatState>()(
             session.id === sessionId ? { ...session, title } : session
           ),
         }))
+      },
+
+      setChatOpen: (open) => {
+        set({ chatOpen: open })
+        // 打开聊天窗口时，清除当前会话的未读计数
+        if (open) {
+          const { currentSessionId } = get()
+          if (currentSessionId) {
+            set((state) => ({
+              sessions: state.sessions.map((session) =>
+                session.id === currentSessionId ? { ...session, unreadCount: 0 } : session
+              ),
+            }))
+          }
+        }
+      },
+
+      markCurrentSessionAsRead: () => {
+        const { currentSessionId } = get()
+        if (!currentSessionId) return
+        set((state) => ({
+          sessions: state.sessions.map((session) =>
+            session.id === currentSessionId ? { ...session, unreadCount: 0 } : session
+          ),
+        }))
+      },
+
+      getTotalUnreadCount: () => {
+        const { sessions } = get()
+        return sessions.reduce((total, session) => total + (session.unreadCount || 0), 0)
       },
     }),
     {

@@ -177,6 +177,11 @@ export const salesOrderApi = {
     api.post(`/sales/orders/${id}/ship`, data),
 }
 
+// 驾驶舱API
+export const dashboardApi = {
+  getStats: () => api.get('/dashboard/stats'),
+}
+
 // AI对话API
 export const chatApi = {
   // 同步请求
@@ -193,7 +198,8 @@ export const chatApi = {
     onError: (error: Error) => void,
     signal?: AbortSignal,
     onThinking?: (thinking: string) => void,
-    onTool?: (toolExecution: { name: string; arguments: Record<string, any>; result: string }) => void
+    onTool?: (toolExecution: { name: string; arguments: Record<string, any>; result: string }) => void,
+    onAction?: (action: ActionEvent) => void
   ) => {
     const eventSource = new EventSourcePolyfill('/api/chat/stream', {
       method: 'POST',
@@ -233,6 +239,20 @@ export const chatApi = {
       }
     })
 
+    // 处理导航动作事件
+    eventSource.addEventListener('action', (event: Event) => {
+      const customEvent = event as CustomEvent<string>
+      const data = customEvent.detail || (customEvent as any).data
+      if (onAction && data) {
+        try {
+          const actionInfo = JSON.parse(data)
+          onAction(actionInfo)
+        } catch (e) {
+          console.error('[SSE] 解析action失败:', e)
+        }
+      }
+    })
+
     eventSource.addEventListener('token', (event: Event) => {
       const customEvent = event as CustomEvent<string>
       onToken(customEvent.detail || (customEvent as any).data)
@@ -265,6 +285,19 @@ export const chatApi = {
 
     return () => eventSource.close()
   },
+}
+
+// 导航动作事件类型
+export interface ActionEvent {
+  action: 'navigate' | 'openCreateForm' | 'openModal'
+  path?: string
+  filter?: Record<string, any>
+  formType?: string
+  recordType?: string
+  recordId?: number
+  requiresConfirmation: boolean
+  confirmText?: string
+  description?: string
 }
 
 // EventSource polyfill for POST requests

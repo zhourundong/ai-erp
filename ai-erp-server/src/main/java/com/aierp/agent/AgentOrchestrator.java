@@ -3,7 +3,9 @@ package com.aierp.agent;
 import com.aierp.ai.ErpAssistant;
 import com.aierp.ai.dto.ChatRequest;
 import com.aierp.ai.dto.ChatResponse;
+import com.aierp.ai.dto.NavigationResult;
 import com.aierp.context.UserContext;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.invocation.InvocationParameters;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.tool.ToolExecution;
@@ -39,6 +41,7 @@ public class AgentOrchestrator {
         void onComplete(ChatResponse response);
         void onError(Exception e);
         default void onToolExecuted(ToolExecution toolExecution) {}
+        default void onAction(NavigationResult action) {}
     }
 
     /**
@@ -130,6 +133,13 @@ public class AgentOrchestrator {
                             truncate(toolExecution.result(), 200));
                     toolExecutions.add(toolExecution);
                     callback.onToolExecuted(toolExecution);
+
+                    // 检查是否是导航工具，提取 NavigationResult
+                    NavigationResult navResult = extractNavigationResult(toolExecution.result());
+                    if (navResult != null) {
+                        log.info("[导航动作] action={}, path={}", navResult.getAction(), navResult.getPath());
+                        callback.onAction(navResult);
+                    }
                 })
                 .onError(error -> {
                     log.error("[流式处理] 错误", error);
@@ -177,5 +187,35 @@ public class AgentOrchestrator {
         if (str == null) return null;
         if (str.length() <= maxLength) return str;
         return str.substring(0, maxLength) + "...";
+    }
+
+    /**
+     * 从工具结果中提取导航信息
+     */
+    private NavigationResult extractNavigationResult(String toolResult) {
+        if (toolResult == null || toolResult.isBlank()) {
+            return null;
+        }
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            Map<String, Object> result = mapper.readValue(toolResult, Map.class);
+
+            // 检查是否包含 navigation 字段
+            if (result.containsKey("navigation")) {
+                Object navObj = result.get("navigation");
+                return mapper.convertValue(navObj, NavigationResult.class);
+            }
+
+            // 检查是否直接是 NavigationResult 格式
+            if (result.containsKey("action") && result.containsKey("path")) {
+                return mapper.convertValue(result, NavigationResult.class);
+            }
+
+        } catch (Exception e) {
+            log.debug("[导航提取] 解析失败，非导航结果: {}", e.getMessage());
+        }
+
+        return null;
     }
 }
