@@ -1,17 +1,31 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+// 工具执行记录
+export interface ToolExecution {
+  name: string
+  arguments: Record<string, any>
+  result: string
+}
+
+// 流式事件 - 按顺序存储
+export interface StreamEvent {
+  type: 'text' | 'tool'  // 文字或工具调用
+  content?: string       // 文字内容（type='text'时）
+  tool?: ToolExecution   // 工具信息（type='tool'时）
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
-  content: string
+  content: string           // 完整文字内容（用于搜索、复制等）
+  events?: StreamEvent[]    // 按顺序的事件列表（文字+工具调用）
   timestamp: string
   intent?: string
-  toolResult?: any
   loading?: boolean
-  thinking?: string  // 思考过程
-  thinkingTimeMs?: number  // 思考耗时(毫秒)
-  processingTimeMs?: number  // 总响应耗时(毫秒)
+  thinking?: string         // 思考过程
+  thinkingTimeMs?: number   // 思考耗时(毫秒)
+  processingTimeMs?: number // 总响应耗时(毫秒)
 }
 
 export interface ChatSession {
@@ -25,48 +39,23 @@ export interface ChatSession {
 interface ChatState {
   sessions: ChatSession[]
   currentSessionId: string | null
-  pendingRequests: Map<string, { sessionId: string; messageId: string }> // messageId -> { sessionId, messageId }
+  pendingRequests: Map<string, { sessionId: string; messageId: string }>
 
-  // 创建新会话
   createSession: () => string
-
-  // 获取当前会话
   getCurrentSession: () => ChatSession | null
-
-  // 获取指定会话
   getSession: (sessionId: string) => ChatSession | null
-
-  // 切换会话
   switchSession: (sessionId: string) => void
-
-  // 添加消息到当前会话
   addMessage: (message: Omit<Message, 'id' | 'timestamp'>) => string
-
-  // 添加消息到指定会话
   addMessageToSession: (sessionId: string, message: Omit<Message, 'id' | 'timestamp'>) => string
-
-  // 更新消息（当前会话）
   updateMessage: (messageId: string, updates: Partial<Message>) => void
-
-  // 更新指定会话中的消息
   updateMessageInSession: (sessionId: string, messageId: string, updates: Partial<Message>) => void
-
-  // 注册待处理请求
+  appendTextToMessage: (sessionId: string, messageId: string, text: string) => void
+  appendToolToMessage: (sessionId: string, messageId: string, tool: ToolExecution) => void
   registerPendingRequest: (messageId: string, sessionId: string) => void
-
-  // 取消请求并更新消息
   cancelPendingRequest: (messageId: string) => void
-
-  // 获取待处理的请求
   getPendingRequest: (messageId: string) => { sessionId: string; messageId: string } | undefined
-
-  // 删除会话
   deleteSession: (sessionId: string) => void
-
-  // 清空当前会话消息
   clearCurrentSession: () => void
-
-  // 更新会话标题
   updateSessionTitle: (sessionId: string, title: string) => void
 }
 
@@ -118,6 +107,8 @@ export const useChatStore = create<ChatState>()(
           ...message,
           id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           timestamp: new Date().toISOString(),
+          events: message.events || [],
+          content: message.content || '',
         }
 
         set((state) => ({
@@ -129,7 +120,7 @@ export const useChatStore = create<ChatState>()(
                   updatedAt: new Date().toISOString(),
                   title:
                     session.messages.length === 0 && message.role === 'user'
-                      ? message.content.slice(0, 20) + (message.content.length > 20 ? '...' : '')
+                      ? (message.content || '').slice(0, 20) + ((message.content || '').length > 20 ? '...' : '')
                       : session.title,
                 }
               : session
@@ -160,6 +151,56 @@ export const useChatStore = create<ChatState>()(
         }))
       },
 
+      // 追加文字到消息（流式）
+      appendTextToMessage: (sessionId, messageId, text) => {
+        set((state) => ({
+          sessions: state.sessions.map((session) =>
+            session.id === sessionId
+              ? {
+                  ...session,
+                  messages: session.messages.map((msg) => {
+                    if (msg.id !== messageId) return msg
+                    // 检查最后一个事件是否是文字，如果是则合并
+                    const events = [...(msg.events || [])]
+                    if (events.length > 0 && events[events.length - 1].type === 'text') {
+                      events[events.length - 1] = {
+                        ...events[events.length - 1],
+                        content: (events[events.length - 1].content || '') + text
+                      }
+                    } else {
+                      events.push({ type: 'text', content: text })
+                    }
+                    return {
+                      ...msg,
+                      content: (msg.content || '') + text,
+                      events
+                    }
+                  }),
+                }
+              : session
+          ),
+        }))
+      },
+
+      // 追加工具调用到消息（流式）
+      appendToolToMessage: (sessionId, messageId, tool) => {
+        set((state) => ({
+          sessions: state.sessions.map((session) =>
+            session.id === sessionId
+              ? {
+                  ...session,
+                  messages: session.messages.map((msg) => {
+                    if (msg.id !== messageId) return msg
+                    const events = [...(msg.events || [])]
+                    events.push({ type: 'tool', tool })
+                    return { ...msg, events }
+                  }),
+                }
+              : session
+          ),
+        }))
+      },
+
       registerPendingRequest: (messageId, sessionId) => {
         const { pendingRequests } = get()
         pendingRequests.set(messageId, { sessionId, messageId })
@@ -169,7 +210,6 @@ export const useChatStore = create<ChatState>()(
         const { pendingRequests } = get()
         const request = pendingRequests.get(messageId)
         if (request) {
-          // 更新消息状态为已取消
           get().updateMessageInSession(request.sessionId, messageId, {
             content: '已停止生成',
             loading: false,

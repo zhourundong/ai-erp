@@ -388,4 +388,69 @@ class PurchaseRequestServiceTest {
             purchaseRequestService.createOrderFromRequest(1L, params);
         });
     }
+
+    // ========== 新增功能测试：添加采购申请明细 ==========
+
+    @Test
+    void testAddRequestItem_Success() {
+        // Given
+        when(purchaseRequestMapper.selectById(1L)).thenReturn(testRequest);
+        when(purchaseRequestItemMapper.insert(any(PurchaseRequestItem.class))).thenAnswer(invocation -> {
+            PurchaseRequestItem item = invocation.getArgument(0);
+            item.setId(10L);
+            return 1;
+        });
+        when(purchaseRequestItemMapper.findByRequestId(1L)).thenReturn(List.of(testItem));
+        when(purchaseRequestMapper.updateById(any(PurchaseRequest.class))).thenReturn(1);
+
+        PurchaseRequestItem newItem = new PurchaseRequestItem();
+        newItem.setProductName("新商品");
+        newItem.setQuantity(new BigDecimal("50"));
+        newItem.setEstimatedPrice(new BigDecimal("10.00"));
+
+        // When
+        PurchaseRequestItem result = purchaseRequestService.addRequestItem(1L, newItem);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1L, result.getRequestId());
+        assertEquals(new BigDecimal("500.00"), result.getEstimatedAmount()); // 50 * 10
+        verify(purchaseRequestItemMapper).insert(any(PurchaseRequestItem.class));
+        verify(purchaseRequestMapper).updateById(any(PurchaseRequest.class)); // 更新总金额
+    }
+
+    @Test
+    void testAddRequestItem_RequestNotFound() {
+        // Given
+        when(purchaseRequestMapper.selectById(999L)).thenReturn(null);
+
+        PurchaseRequestItem newItem = new PurchaseRequestItem();
+        newItem.setProductName("新商品");
+
+        // When & Then
+        assertThrows(BusinessException.class, () -> {
+            purchaseRequestService.addRequestItem(999L, newItem);
+        });
+    }
+
+    @Test
+    void testAddRequestItem_CalculatesAmount() {
+        // Given
+        when(purchaseRequestMapper.selectById(1L)).thenReturn(testRequest);
+        when(purchaseRequestItemMapper.insert(any(PurchaseRequestItem.class))).thenReturn(1);
+        when(purchaseRequestItemMapper.findByRequestId(1L)).thenReturn(List.of(testItem));
+        when(purchaseRequestMapper.updateById(any(PurchaseRequest.class))).thenReturn(1);
+
+        PurchaseRequestItem newItem = new PurchaseRequestItem();
+        newItem.setProductName("新商品");
+        newItem.setQuantity(new BigDecimal("20"));
+        newItem.setEstimatedPrice(new BigDecimal("15.00"));
+        // 未设置 estimatedAmount
+
+        // When
+        PurchaseRequestItem result = purchaseRequestService.addRequestItem(1L, newItem);
+
+        // Then
+        assertEquals(new BigDecimal("300.00"), result.getEstimatedAmount()); // 自动计算 20 * 15
+    }
 }

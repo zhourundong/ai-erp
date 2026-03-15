@@ -2,6 +2,7 @@ package com.aierp.service;
 
 import com.aierp.entity.Inventory;
 import com.aierp.entity.InventoryTransaction;
+import com.aierp.entity.Warehouse;
 import com.aierp.mapper.InventoryMapper;
 import com.aierp.mapper.InventoryTransactionMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,13 +30,21 @@ class InventoryServiceTest {
     @Mock
     private InventoryTransactionMapper transactionMapper;
 
+    @Mock
+    private WarehouseService warehouseService;
+
     @InjectMocks
     private InventoryService inventoryService;
 
     private Inventory testInventory;
+    private Warehouse testWarehouse;
 
     @BeforeEach
     void setUp() {
+        testWarehouse = new Warehouse();
+        testWarehouse.setId(1L);
+        testWarehouse.setName("主仓库");
+
         testInventory = new Inventory();
         testInventory.setId(1L);
         testInventory.setWarehouseId(1L);
@@ -51,19 +60,21 @@ class InventoryServiceTest {
     @Test
     void testStockIn_NewInventory() {
         // Given
+        when(warehouseService.getById(1L)).thenReturn(testWarehouse);
         when(inventoryMapper.findByWarehouseAndProduct(1L, 1L)).thenReturn(null);
         when(inventoryMapper.insert(any(Inventory.class))).thenAnswer(invocation -> {
             Inventory i = invocation.getArgument(0);
             i.setId(1L);
             return 1;
         });
+
         when(transactionMapper.insert(any(InventoryTransaction.class))).thenReturn(1);
 
         // When
         Inventory result = inventoryService.stockIn(
                 1L, 1L, "SKU001", "测试商品",
                 new BigDecimal("50"), new BigDecimal("10.00"),
-                "PURCHASE", 1L, "PO001", "admin"
+                "PURCHASE", "PURCHASE_ORDER", 1L, "PO001", "admin"
         );
 
         // Then
@@ -76,6 +87,7 @@ class InventoryServiceTest {
     @Test
     void testStockIn_ExistingInventory() {
         // Given
+        when(warehouseService.getById(1L)).thenReturn(testWarehouse);
         when(inventoryMapper.findByWarehouseAndProduct(1L, 1L)).thenReturn(testInventory);
         when(inventoryMapper.updateById(any(Inventory.class))).thenReturn(1);
         when(transactionMapper.insert(any(InventoryTransaction.class))).thenReturn(1);
@@ -84,7 +96,7 @@ class InventoryServiceTest {
         Inventory result = inventoryService.stockIn(
                 1L, 1L, "SKU001", "测试商品",
                 new BigDecimal("50"), new BigDecimal("12.00"),
-                "PURCHASE", 1L, "PO001", "admin"
+                "PURCHASE", "PURCHASE_ORDER", 1L, "PO001", "admin"
         );
 
         // Then
@@ -97,6 +109,7 @@ class InventoryServiceTest {
     @Test
     void testStockOut_Success() {
         // Given
+        when(warehouseService.getById(1L)).thenReturn(testWarehouse);
         when(inventoryMapper.findByWarehouseAndProduct(1L, 1L)).thenReturn(testInventory);
         when(inventoryMapper.updateById(any(Inventory.class))).thenReturn(1);
         when(transactionMapper.insert(any(InventoryTransaction.class))).thenReturn(1);
@@ -104,7 +117,7 @@ class InventoryServiceTest {
         // When
         Inventory result = inventoryService.stockOut(
                 1L, 1L, new BigDecimal("30"),
-                "SALES", 1L, "SO001", "admin"
+                "SALES", new BigDecimal("200.00"), "SALES_ORDER", 1L, "SO001", "admin"
         );
 
         // Then
@@ -122,7 +135,7 @@ class InventoryServiceTest {
         // When & Then
         assertThrows(RuntimeException.class, () -> inventoryService.stockOut(
                 1L, 1L, new BigDecimal("200"),
-                "SALES", 1L, "SO001", "admin"
+                "SALES", new BigDecimal("200.00"), "SALES_ORDER", 1L, "SO001", "admin"
         ));
     }
 
@@ -134,7 +147,7 @@ class InventoryServiceTest {
         // When & Then
         assertThrows(RuntimeException.class, () -> inventoryService.stockOut(
                 1L, 1L, new BigDecimal("10"),
-                "SALES", 1L, "SO001", "admin"
+                "SALES", new BigDecimal("200.00"), "SALES_ORDER", 1L, "SO001", "admin"
         ));
     }
 

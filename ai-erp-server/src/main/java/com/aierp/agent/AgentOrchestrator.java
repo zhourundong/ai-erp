@@ -1,211 +1,181 @@
 package com.aierp.agent;
 
-import com.aierp.ai.ModelAdapter;
-import com.aierp.ai.ModelFactory;
+import com.aierp.ai.ErpAssistant;
 import com.aierp.ai.dto.ChatRequest;
 import com.aierp.ai.dto.ChatResponse;
+import com.aierp.context.UserContext;
+import dev.langchain4j.invocation.InvocationParameters;
+import dev.langchain4j.service.TokenStream;
+import dev.langchain4j.service.tool.ToolExecution;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * AI Agent编排器
  *
- * 负责处理用户对话，协调意图识别、任务规划和工具执行
- * 这是AI原生ERP的核心智能引擎
+ * 负责处理用户对话，协调工具执行
+ * 使用 LangChain4j AI Services 框架，支持工具调用和流式响应
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class AgentOrchestrator {
 
-    private final ModelFactory modelFactory;
-    private final IntentClassifier intentClassifier;
-    private final TaskPlanner taskPlanner;
+    private final ErpAssistant erpAssistant;
 
     /**
      * 流式回调接口
      */
     public interface StreamCallback {
-        /**
-         * 收到思考过程
-         */
         default void onThinking(String thinking) {}
-
-        /**
-         * 收到实际内容
-         */
         void onToken(String token);
-
-        /**
-         * 流式完成
-         */
         void onComplete(ChatResponse response);
-
-        /**
-         * 发生错误
-         */
         void onError(Exception e);
+        default void onToolExecuted(ToolExecution toolExecution) {}
     }
 
     /**
      * 处理对话请求（同步）
      */
     public ChatResponse process(ChatRequest request) {
-        long startTime = System.currentTimeMillis();
-
-        try {
-            // 1. 获取AI模型
-            ModelAdapter model = modelFactory.getDefaultModel();
-            if (!model.isAvailable()) {
-                return ChatResponse.builder()
-                        .error("AI模型不可用，请检查配置")
-                        .build();
-            }
-
-            // 2. 意图识别
-            String intent = intentClassifier.classify(request.getMessage(), model);
-            log.info("识别到意图: {}", intent);
-
-            // 3. 任务规划
-            TaskPlan plan = taskPlanner.plan(intent, request.getMessage());
-            log.info("任务计划: {}", plan);
-
-            // 4. 设置系统提示
-            String systemPrompt = buildSystemPrompt();
-            ChatRequest enrichedRequest = ChatRequest.builder()
-                    .message(request.getMessage())
-                    .sessionId(request.getSessionId())
-                    .history(request.getHistory())
-                    .systemPrompt(systemPrompt)
-                    .build();
-
-            // 5. 调用AI模型处理
-            ChatResponse response = model.chat(enrichedRequest);
-            response.setIntent(intent);
-            response.setProcessingTimeMs(System.currentTimeMillis() - startTime);
-
-            return response;
-
-        } catch (Exception e) {
-            log.error("处理对话请求失败", e);
-            return ChatResponse.builder()
-                    .error("处理请求失败: " + e.getMessage())
-                    .processingTimeMs(System.currentTimeMillis() - startTime)
-                    .build();
-        }
+        return ChatResponse.builder()
+                .error("同步模式暂不支持，请使用流式模式")
+                .build();
     }
 
     /**
      * 处理对话请求（流式）
+     *
+     * 统一使用 AI Services 模式，支持工具调用
+     * 用户信息通过 InvocationParameters 传递 UserContext，在 Tool 中通过 InvocationContext 获取
      */
     public void processStream(ChatRequest request, StreamCallback callback) {
         long startTime = System.currentTimeMillis();
         log.info("[流式处理] 开始处理请求: {}", request.getMessage());
 
-        try {
-            // 1. 获取AI模型
-            ModelAdapter model = modelFactory.getDefaultModel();
-            log.info("[流式处理] 获取模型: {}, isAvailable={}, isStreamingAvailable={}",
-                model.getModelName(), model.isAvailable(), model.isStreamingAvailable());
+        if (erpAssistant == null) {
+            callback.onError(new Exception("AI模型未配置，请检查配置"));
+            return;
+        }
 
-            if (!model.isAvailable()) {
-                callback.onError(new Exception("AI模型不可用，请检查配置"));
-                return;
+        try {
+            String sessionId = request.getSessionId() != null ? request.getSessionId() : "default";
+            StringBuilder fullResponse = new StringBuilder();
+            List<ToolExecution> toolExecutions = new ArrayList<>();
+            StringBuilder thinkingBuilder = new StringBuilder();
+            long[] thinkingStartTime = {0};
+            long[] thinkingEndTime = {0};
+
+            // 获取当前用户信息
+            UserContext userContext = UserContext.get();
+            Long userId = userContext != null ? userContext.getUserId() : null;
+            String username = userContext != null ? userContext.getUsername() : "未知用户";
+
+            log.info("[流式处理] 用户信息: userId={}, username={}", userId, username);
+
+            // 将用户信息存储到会话上下文（备用）
+            if (userId != null) {
+                UserContext.setForSession(sessionId, userContext);
             }
 
-            // 2. 意图识别
-            long intentStart = System.currentTimeMillis();
-            String intent = intentClassifier.classify(request.getMessage(), model);
-            log.info("[流式处理] 意图识别完成: {} (耗时: {}ms)", intent, System.currentTimeMillis() - intentStart);
+            // 通过 InvocationParameters 传递 UserContext 对象
+            Map<String, Object> paramsMap = new HashMap<>();
+            paramsMap.put("userContext", userContext);
+            InvocationParameters parameters = InvocationParameters.from(paramsMap);
 
-            // 3. 任务规划
-            long planStart = System.currentTimeMillis();
-            TaskPlan plan = taskPlanner.plan(intent, request.getMessage());
-            log.info("[流式处理] 任务规划完成: {} (耗时: {}ms)", plan, System.currentTimeMillis() - planStart);
+            TokenStream tokenStream = erpAssistant.chat(sessionId, request.getMessage(), parameters);
 
-            // 4. 设置系统提示
-            String systemPrompt = buildSystemPrompt();
-            ChatRequest enrichedRequest = ChatRequest.builder()
-                    .message(request.getMessage())
-                    .sessionId(request.getSessionId())
-                    .history(request.getHistory())
-                    .systemPrompt(systemPrompt)
-                    .build();
-
-            // 5. 调用流式AI模型处理
-            final String finalIntent = intent;
-            final int[] tokenCount = {0};
-
-            log.info("[流式处理] 开始调用 model.streamChat()...");
-            long streamStart = System.currentTimeMillis();
-
-            model.streamChat(enrichedRequest, new ModelAdapter.StreamCallback() {
-                @Override
-                public void onThinking(String thinking) {
-                    callback.onThinking(thinking);
-                }
-
-                @Override
-                public void onToken(String token) {
-                    tokenCount[0]++;
-                    if (tokenCount[0] == 1) {
-                        log.info("[流式处理] 收到第一个token (耗时: {}ms)", System.currentTimeMillis() - streamStart);
+            tokenStream
+                .onPartialResponse(token -> {
+                    // 检查是否是思考过程（某些模型如 DeepSeek 会输出思考和...[思考内容]...SKU 标签）
+                    if (isThinkingToken(token, thinkingBuilder, thinkingStartTime, thinkingEndTime)) {
+                        callback.onThinking(token);
+                    } else {
+                        fullResponse.append(token);
+                        callback.onToken(token);
                     }
-                    callback.onToken(token);
-                }
+                })
+                .onCompleteResponse(response -> {
+                    long processingTime = System.currentTimeMillis() - startTime;
+                    Long thinkingTime = null;
+                    if (thinkingStartTime[0] > 0 && thinkingEndTime[0] > 0) {
+                        thinkingTime = thinkingEndTime[0] - thinkingStartTime[0];
+                    }
 
-                @Override
-                public void onComplete(String fullResponse, Long thinkingTimeMs) {
-                    long totalTime = System.currentTimeMillis() - startTime;
-                    log.info("[流式处理] 完成: 总耗时={}ms, 思考耗时={}ms, token数={}, 内容长度={}",
-                        totalTime, thinkingTimeMs, tokenCount[0], fullResponse != null ? fullResponse.length() : 0);
-                    ChatResponse response = ChatResponse.builder()
-                            .content(fullResponse)
-                            .model(model.getModelName())
-                            .intent(finalIntent)
-                            .processingTimeMs(totalTime)
-                            .thinkingTimeMs(thinkingTimeMs)
+                    log.info("[流式处理] 完成: 耗时={}ms, 内容长度={}, 工具调用次数={}, 思考耗时={}ms",
+                            processingTime, fullResponse.length(), toolExecutions.size(), thinkingTime);
+
+                    // 清理会话用户上下文
+                    UserContext.clearForSession(sessionId);
+
+                    ChatResponse chatResponse = ChatResponse.builder()
+                            .content(fullResponse.toString())
+                            .model("AI-Services")
+                            .processingTimeMs(processingTime)
+                            .thinkingTimeMs(thinkingTime)
                             .timestamp(LocalDateTime.now())
                             .build();
-                    callback.onComplete(response);
-                }
-
-                @Override
-                public void onError(Exception e) {
-                    log.error("[流式处理] 错误", e);
-                    callback.onError(e);
-                }
-            });
-
-            log.info("[流式处理] model.streamChat() 方法返回 (同步阻塞结束)");
+                    callback.onComplete(chatResponse);
+                })
+                .onToolExecuted(toolExecution -> {
+                    log.info("[工具执行] name={}, result={}",
+                            toolExecution.request().name(),
+                            truncate(toolExecution.result(), 200));
+                    toolExecutions.add(toolExecution);
+                    callback.onToolExecuted(toolExecution);
+                })
+                .onError(error -> {
+                    log.error("[流式处理] 错误", error);
+                    // 清理会话用户上下文
+                    UserContext.clearForSession(sessionId);
+                    callback.onError(new Exception(error));
+                })
+                .start();
 
         } catch (Exception e) {
-            log.error("处理流式对话请求失败", e);
+            log.error("[流式处理] 处理失败", e);
             callback.onError(e);
         }
     }
 
     /**
-     * 构建系统提示
+     * 检查是否是思考过程的 token
+     *
+     * 支持模型输出的 思考和...[思考内容]... SKU 标签格式
      */
-    private String buildSystemPrompt() {
-        return """
-            你是AI原生ERP系统的智能助手，专注于采购供应链管理。
+    private boolean isThinkingToken(String token, StringBuilder thinkingBuilder, long[] thinkingStartTime, long[] thinkingEndTime) {
+        // 检查是否进入思考模式
+        if (token.contains("思考和")) {
+            if (thinkingStartTime[0] == 0) {
+                thinkingStartTime[0] = System.currentTimeMillis();
+            }
+            thinkingBuilder.append(token);
+            return true;
+        }
 
-            你的职责：
-            1. 帮助用户创建和管理采购申请
-            2. 推荐合适的供应商
-            3. 分析采购数据和风险
-            4. 回答采购相关问题
+        // 已经在思考模式中
+        if (thinkingStartTime[0] > 0 && thinkingEndTime[0] == 0) {
+            thinkingBuilder.append(token);
+            // 检查是否结束思考模式
+            if (token.contains("SKU")) {
+                thinkingEndTime[0] = System.currentTimeMillis();
+            }
+            return true;
+        }
 
-            回答要求：
-            - 专业、准确、简洁
-            - 涉及敏感操作时需要提醒用户确认
-            - 提供数据时要有清晰的格式
-            - 如果信息不足，主动询问用户
-            """;
+        return false;
+    }
+
+    private String truncate(String str, int maxLength) {
+        if (str == null) return null;
+        if (str.length() <= maxLength) return str;
+        return str.substring(0, maxLength) + "...";
     }
 }

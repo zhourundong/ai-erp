@@ -3,6 +3,7 @@ package com.aierp.controller;
 import com.aierp.agent.AgentOrchestrator;
 import com.aierp.ai.dto.ChatRequest;
 import com.aierp.ai.dto.ChatResponse;
+import com.aierp.context.UserContext;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,6 +75,9 @@ public class ChatController {
 
         log.info("收到流式对话请求: sessionId={}, message={}", request.getSessionId(), request.getMessage());
 
+        // 捕获当前线程的用户上下文（用于传递给异步线程）
+        UserContext capturedContext = UserContext.get();
+
         // 设置SSE响应头，禁用缓冲
         httpResponse.setHeader("Cache-Control", "no-cache, no-transform");
         httpResponse.setHeader("Connection", "keep-alive");
@@ -87,6 +91,11 @@ public class ChatController {
 
         // 在异步线程中处理
         executorService.execute(() -> {
+            // 在异步线程中设置用户上下文
+            if (capturedContext != null) {
+                UserContext.set(capturedContext);
+            }
+
             try {
                 agentOrchestrator.processStream(request, new AgentOrchestrator.StreamCallback() {
                     @Override
@@ -175,6 +184,26 @@ public class ChatController {
                             }
                         }
                     }
+
+                    @Override
+                    public void onToolExecuted(dev.langchain4j.service.tool.ToolExecution toolExecution) {
+                        if (isCompleted[0]) return;
+                        try {
+                            log.info("工具执行: {}", toolExecution.request().name());
+                            // 发送工具执行事件
+                            java.util.Map<String, Object> toolInfo = new java.util.HashMap<>();
+                            toolInfo.put("name", toolExecution.request().name());
+                            toolInfo.put("arguments", toolExecution.request().arguments());
+                            toolInfo.put("result", toolExecution.result());
+                            emitter.send(SseEmitter.event()
+                                    .name("tool")
+                                    .data(toolInfo));
+                        } catch (IOException e) {
+                            log.warn("发送tool事件失败: {}", e.getMessage());
+                        } catch (IllegalStateException e) {
+                            log.warn("Emitter已完成，无法发送tool: {}", e.getMessage());
+                        }
+                    }
                 });
 
             } catch (Exception e) {
@@ -194,6 +223,9 @@ public class ChatController {
                         // ignore
                     }
                 }
+            } finally {
+                // 清理异步线程的用户上下文
+                UserContext.clear();
             }
         });
 

@@ -192,7 +192,8 @@ export const chatApi = {
     onComplete: (response: any) => void,
     onError: (error: Error) => void,
     signal?: AbortSignal,
-    onThinking?: (thinking: string) => void
+    onThinking?: (thinking: string) => void,
+    onTool?: (toolExecution: { name: string; arguments: Record<string, any>; result: string }) => void
   ) => {
     const eventSource = new EventSourcePolyfill('/api/chat/stream', {
       method: 'POST',
@@ -210,6 +211,25 @@ export const chatApi = {
       const thinking = customEvent.detail || (customEvent as any).data
       if (onThinking && thinking) {
         onThinking(thinking)
+      }
+    })
+
+    // 处理工具执行事件
+    eventSource.addEventListener('tool', (event: Event) => {
+      const customEvent = event as CustomEvent<string>
+      const data = customEvent.detail || (customEvent as any).data
+      if (onTool && data) {
+        try {
+          const toolInfo = JSON.parse(data)
+          // 转换为 ToolExecution 格式
+          onTool({
+            name: toolInfo.name,
+            arguments: toolInfo.arguments || {},
+            result: typeof toolInfo.result === 'string' ? toolInfo.result : JSON.stringify(toolInfo.result)
+          })
+        } catch (e) {
+          console.error('[SSE] 解析工具执行信息失败:', e)
+        }
       }
     })
 

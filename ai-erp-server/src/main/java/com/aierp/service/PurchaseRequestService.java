@@ -125,6 +125,33 @@ public class PurchaseRequestService {
     }
 
     /**
+     * 添加采购申请明细
+     */
+    @Transactional
+    public PurchaseRequestItem addRequestItem(Long requestId, PurchaseRequestItem item) {
+        PurchaseRequest request = purchaseRequestMapper.selectById(requestId);
+        if (request == null) {
+            throw new BusinessException("采购申请不存在");
+        }
+
+        item.setRequestId(requestId);
+        if (item.getEstimatedAmount() == null && item.getEstimatedPrice() != null && item.getQuantity() != null) {
+            item.setEstimatedAmount(item.getEstimatedPrice().multiply(item.getQuantity()));
+        }
+        purchaseRequestItemMapper.insert(item);
+
+        // 更新主表总金额
+        List<PurchaseRequestItem> items = purchaseRequestItemMapper.findByRequestId(requestId);
+        BigDecimal totalAmount = items.stream()
+                .map(i -> i.getEstimatedAmount() != null ? i.getEstimatedAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        request.setTotalAmount(totalAmount);
+        purchaseRequestMapper.updateById(request);
+
+        return item;
+    }
+
+    /**
      * 删除采购申请
      */
     @Transactional

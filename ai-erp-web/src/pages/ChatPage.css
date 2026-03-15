@@ -424,3 +424,108 @@
   font-family: 'Consolas', 'Monaco', monospace;
   font-size: 12px;
 }
+
+/* 工具执行记录 - 内联样式 */
+.tool-card-inline {
+  margin: 8px 0;
+  border: 1px solid #d9f7be;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f6ffed 0%, #ffffff 100%);
+}
+
+.tool-card-inline .ant-card-body {
+  padding: 8px 12px;
+}
+
+.tool-header-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.tool-header-inline .tool-name {
+  font-weight: 500;
+  color: #52c41a;
+}
+
+.tool-card-inline .ant-collapse {
+  border: none;
+  background: transparent;
+}
+
+.tool-card-inline .ant-collapse-header {
+  padding: 4px 0 !important;
+  font-size: 12px;
+}
+
+.tool-card-inline .ant-collapse-content {
+  border-top: none;
+}
+
+.tool-card-inline .ant-collapse-content-box {
+  padding: 8px !important;
+  background: #fff;
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tool-result {
+  margin: 0;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: 'Consolas', 'Monaco', monospace;
+  color: #333;
+}
+
+/* 流式事件容器 */
+.stream-events {
+  line-height: 1.6;
+}
+
+.stream-events p {
+  margin: 8px 0;
+}
+
+.stream-events ul, .stream-events ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.stream-events code {
+  background: #f6f8fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+}
+
+.stream-events pre {
+  background: #f6f8fa;
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.stream-events pre code {
+  background: none;
+  padding: 0;
+}
+
+.stream-events table {
+  border-collapse: collapse;
+  margin: 8px 0;
+}
+
+.stream-events th, .stream-events td {
+  border: 1px solid #e5e7eb;
+  padding: 8px 12px;
+}
+
+.stream-events th {
+  background: #f6f8fa;
+  font-weight: 600;
+}

@@ -166,6 +166,9 @@ export default function ProductPage() {
         width={600}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          <Form.Item name="sku" label="SKU编码" extra="不填则自动生成">
+            <Input placeholder="请输入商品SKU编码" disabled={!!editingProduct} />
+          </Form.Item>
           <Form.Item name="name" label="商品名称" rules={[{ required: true }]}>
             <Input />
           </Form.Item>

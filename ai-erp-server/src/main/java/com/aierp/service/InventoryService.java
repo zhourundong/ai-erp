@@ -2,6 +2,7 @@ package com.aierp.service;
 
 import com.aierp.entity.Inventory;
 import com.aierp.entity.InventoryTransaction;
+import com.aierp.entity.Product;
 import com.aierp.entity.Warehouse;
 import com.aierp.mapper.InventoryMapper;
 import com.aierp.mapper.InventoryTransactionMapper;
@@ -22,6 +23,7 @@ public class InventoryService {
     private final InventoryMapper inventoryMapper;
     private final InventoryTransactionMapper transactionMapper;
     private final WarehouseService warehouseService;
+    private final ProductService productService;
 
     public Page<Inventory> pageInventory(int pageNum, int pageSize, Long warehouseId, Long productId) {
         Page<Inventory> page = new Page<>(pageNum, pageSize);
@@ -67,6 +69,25 @@ public class InventoryService {
     public Inventory stockIn(Long warehouseId, Long productId, String productSku, String productName,
                               BigDecimal quantity, BigDecimal costPrice, String transactionType,
                               String orderType, Long orderId, String orderNo, String operator) {
+
+        // 如果 productId 为 null，尝试通过 SKU 查找商品
+        if (productId == null && productSku != null && !productSku.isEmpty()) {
+            Product product = productService.getBySku(productSku);
+            if (product != null) {
+                productId = product.getId();
+            }
+        }
+
+        // 如果仍然没有 productId，生成一个临时ID（负数表示临时）
+        if (productId == null) {
+            // 使用 SKU 的 hashCode 生成一个临时 productId（正数）
+            productId = (long) Math.abs(productSku != null ? productSku.hashCode() : productName.hashCode());
+            // 确保不与真实商品ID冲突（使用大数值区间）
+            if (productId < 1000000) {
+                productId += 1000000;
+            }
+        }
+
         Inventory inventory = inventoryMapper.findByWarehouseAndProduct(warehouseId, productId);
 
         BigDecimal beforeQty = BigDecimal.ZERO;

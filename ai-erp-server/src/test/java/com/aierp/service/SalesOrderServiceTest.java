@@ -281,7 +281,7 @@ class SalesOrderServiceTest {
         // 模拟库存出库返回
         Inventory mockInventory = new Inventory();
         mockInventory.setQuantity(new BigDecimal("90"));
-        when(inventoryService.stockOut(anyLong(), anyLong(), any(), any(), anyLong(), any(), any()))
+        when(inventoryService.stockOut(anyLong(), anyLong(), any(), any(), any(), any(), anyLong(), any(), any()))
                 .thenReturn(mockInventory);
 
         ShipRequest.ShipItem shipItem = new ShipRequest.ShipItem();
@@ -294,7 +294,7 @@ class SalesOrderServiceTest {
         // Then
         assertEquals("COMPLETED", result.getStatus());
         assertNotNull(result.getActualDeliveryDate());
-        verify(inventoryService).stockOut(eq(1L), eq(100L), eq(new BigDecimal("10")), any(), eq(1L), any(), eq("李四"));
+        verify(inventoryService).stockOut(eq(1L), eq(100L), eq(new BigDecimal("10")), any(), any(), any(), eq(1L), any(), eq("李四"));
     }
 
     @Test

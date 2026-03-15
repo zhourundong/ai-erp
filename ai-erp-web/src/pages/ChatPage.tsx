@@ -1,11 +1,11 @@
 import { useRef, useEffect, useState } from 'react'
 import { Input, Button, Avatar, Spin, Card, Tag, Space, Popconfirm, Collapse } from 'antd'
-import { SendOutlined, RobotOutlined, UserOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, StopOutlined, BulbOutlined } from '@ant-design/icons'
+import { SendOutlined, RobotOutlined, UserOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, StopOutlined, BulbOutlined, ToolOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { chatApi } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
-import { useChatStore } from '../stores/chatStore'
+import { useChatStore, StreamEvent, ToolExecution } from '../stores/chatStore'
 import './ChatPage.css'
 
 // 存储当前请求的 AbortController
@@ -14,9 +14,7 @@ const abortControllers = new Map<string, AbortController>()
 // 解码 Base64 数据
 function decodeBase64(encoded: string): string {
   try {
-    // Base64 解码
     const binaryString = atob(encoded)
-    // 转换为 UTF-8
     const bytes = new Uint8Array(binaryString.length)
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i)
@@ -28,11 +26,6 @@ function decodeBase64(encoded: string): string {
   }
 }
 
-// 处理思考过程中的换行符
-function processThinkingText(text: string): string {
-  return text
-}
-
 // 格式化耗时显示
 function formatDuration(ms: number | undefined): string {
   if (!ms) return ''
@@ -41,21 +34,64 @@ function formatDuration(ms: number | undefined): string {
   return `${Math.floor(ms / 60000)}m ${((ms % 60000) / 1000).toFixed(0)}s`
 }
 
-// 思考过程折叠组件 - 管理自己的展开/折叠状态
+// 单个工具执行卡片
+function ToolCard({ tool }: { tool: ToolExecution }) {
+  return (
+    <Card size="small" className="tool-card-inline">
+      <div className="tool-header-inline">
+        <ToolOutlined style={{ color: '#52c41a' }} />
+        <span className="tool-name">{tool.name}</span>
+        <Tag color="success" icon={<CheckCircleOutlined />}>已执行</Tag>
+      </div>
+      <Collapse
+        size="small"
+        ghost
+        items={[
+          {
+            key: '1',
+            label: <span style={{ color: '#666', fontSize: '12px' }}>查看结果</span>,
+            children: (
+              <pre className="tool-result">
+                {typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result, null, 2)}
+              </pre>
+            ),
+          },
+        ]}
+      />
+    </Card>
+  )
+}
+
+// 渲染流式事件列表（按顺序）
+function StreamEventsDisplay({ events, isLoading }: { events: StreamEvent[]; isLoading?: boolean }) {
+  if (!events || events.length === 0) return null
+
+  return (
+    <div className="stream-events">
+      {events.map((event, index) => {
+        if (event.type === 'tool' && event.tool) {
+          return <ToolCard key={`tool-${index}`} tool={event.tool} />
+        } else if (event.type === 'text' && event.content) {
+          return (
+            <ReactMarkdown key={`text-${index}`} remarkPlugins={[remarkGfm]}>
+              {event.content}
+            </ReactMarkdown>
+          )
+        }
+        return null
+      })}
+      {isLoading && <span className="typing-cursor">▌</span>}
+    </div>
+  )
+}
+
+// 思考过程折叠组件
 function ThinkingCollapse({ thinking, isLoading, thinkingTimeMs }: { thinking: string; isLoading?: boolean; thinkingTimeMs?: number }) {
   const [activeKey, setActiveKey] = useState<string[]>(isLoading ? ['thinking'] : [])
 
-  // 当 loading 状态变化时更新展开状态
   useEffect(() => {
-    if (isLoading) {
-      setActiveKey(['thinking'])
-    } else {
-      setActiveKey([])
-    }
+    setActiveKey(isLoading ? ['thinking'] : [])
   }, [isLoading])
-
-  // 处理换行符
-  const processedThinking = processThinkingText(thinking)
 
   return (
     <Collapse
@@ -75,9 +111,7 @@ function ThinkingCollapse({ thinking, isLoading, thinkingTimeMs }: { thinking: s
           ),
           children: (
             <div className="thinking-content">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {processedThinking}
-              </ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{thinking}</ReactMarkdown>
             </div>
           ),
         },
@@ -112,9 +146,7 @@ export default function ChatPage() {
     scrollToBottom()
   }, [messages])
 
-  // 初始化：如果没有会话则创建一个
   useEffect(() => {
-    // 使用 setTimeout 确保 zustand persist 中间件已经从 localStorage 恢复状态
     const timer = setTimeout(() => {
       const state = useChatStore.getState()
       if (state.sessions.length === 0) {
@@ -128,42 +160,32 @@ export default function ChatPage() {
 
   const handleSend = async () => {
     const input = inputValue.trim()
+    if (!input || loading) return
 
-    if (!input || loading) {
-      return
-    }
-
-    // 清空输入框
     setInputValue('')
 
-    // 确保有会话 - 直接从 store 获取最新状态
     const store = useChatStore.getState()
     let sessionId = store.currentSessionId
     if (!sessionId) {
       sessionId = store.createSession()
     }
 
-    // 添加用户消息到指定会话
     store.addMessageToSession(sessionId, {
       role: 'user',
       content: input,
     })
 
-    // 添加AI加载消息，保存消息ID用于后续更新
     const loadingMsgId = store.addMessageToSession(sessionId, {
       role: 'assistant',
       content: '',
+      events: [],
       loading: true,
     })
 
-    // 创建 AbortController 用于取消请求
     const abortController = new AbortController()
     abortControllers.set(loadingMsgId, abortController)
-
-    // 注册待处理请求
     store.registerPendingRequest(loadingMsgId, sessionId)
 
-    // 获取消息历史
     const session = store.getSession(sessionId)
     const historyMessages = (session?.messages || [])
       .filter(m => !m.loading)
@@ -173,43 +195,27 @@ export default function ChatPage() {
         content: m.content,
       }))
 
-    // 使用流式响应
     chatApi.stream(
       input,
       sessionId,
       historyMessages,
-      // onToken - 逐步更新内容
+      // onToken
       (token: string) => {
-        console.log('[SSE] 收到token:', token)
-        const currentSession = useChatStore.getState().getSession(sessionId)
-        const currentMsg = currentSession?.messages.find(m => m.id === loadingMsgId)
-        if (currentMsg) {
-          // Base64 解码
-          const decodedToken = decodeBase64(token)
-          console.log('[SSE] 解析后:', decodedToken)
-          store.updateMessageInSession(sessionId, loadingMsgId, {
-            content: currentMsg.content + decodedToken,
-          })
-        }
+        const decodedToken = decodeBase64(token)
+        store.appendTextToMessage(sessionId, loadingMsgId, decodedToken)
       },
-      // onComplete - 完成响应
+      // onComplete
       (response: any) => {
-        console.log('[SSE] 完成:', response)
         store.updateMessageInSession(sessionId, loadingMsgId, {
           loading: false,
-          intent: response.intent,
-          toolResult: response.toolResult,
           thinkingTimeMs: response.thinkingTimeMs,
           processingTimeMs: response.processingTimeMs,
         })
         abortControllers.delete(loadingMsgId)
       },
-      // onError - 错误处理
+      // onError
       (error: Error) => {
-        console.error('[SSE] 错误:', error)
-        if (abortController.signal.aborted) {
-          return
-        }
+        if (abortController.signal.aborted) return
         store.updateMessageInSession(sessionId, loadingMsgId, {
           content: error.message || '抱歉，发生了错误，请稍后重试。',
           loading: false,
@@ -217,40 +223,36 @@ export default function ChatPage() {
         abortControllers.delete(loadingMsgId)
       },
       abortController.signal,
-      // onThinking - 思考过程
+      // onThinking
       (thinking: string) => {
-        console.log('[SSE] 收到thinking:', thinking)
+        const decodedThinking = decodeBase64(thinking)
         const currentSession = useChatStore.getState().getSession(sessionId)
         const currentMsg = currentSession?.messages.find(m => m.id === loadingMsgId)
         if (currentMsg) {
-          // Base64 解码
-          const decodedThinking = decodeBase64(thinking)
-          console.log('[SSE] thinking解析后:', decodedThinking)
           store.updateMessageInSession(sessionId, loadingMsgId, {
             thinking: (currentMsg.thinking || '') + decodedThinking,
           })
         }
+      },
+      // onTool
+      (toolExecution: ToolExecution) => {
+        store.appendToolToMessage(sessionId, loadingMsgId, toolExecution)
       }
     )
   }
 
-  // 停止当前响应
   const handleStop = () => {
     const store = useChatStore.getState()
     const session = store.getCurrentSession()
     if (!session) return
 
-    // 找到正在加载的消息
     const loadingMsg = session.messages.find(m => m.loading)
     if (loadingMsg) {
-      // 取消请求
       const controller = abortControllers.get(loadingMsg.id)
       if (controller) {
         controller.abort()
         abortControllers.delete(loadingMsg.id)
       }
-
-      // 更新消息状态
       store.updateMessageInSession(session.id, loadingMsg.id, {
         content: '已停止生成',
         loading: false,
@@ -265,27 +267,27 @@ export default function ChatPage() {
     }
   }
 
-  const handleNewChat = () => {
-    createSession()
-  }
-
-  const handleClearChat = () => {
-    clearCurrentSession()
-  }
-
-  const handleDeleteSession = (sessionId: string) => {
-    deleteSession(sessionId)
-  }
-
   return (
     <div className="chat-page">
-      {/* 左侧会话列表 */}
       <div className="sessions-sidebar">
         <div className="sessions-header">
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={handleNewChat}
+            onClick={() => {
+              // 如果当前会话存在且没有消息，不创建新会话
+              if (currentSession && currentSession.messages.length === 0) {
+                return
+              }
+              // 检查最新的会话是否为空（sessions按时间倒序排列，第一个是最新的）
+              const latestSession = sessions[0]
+              if (latestSession && latestSession.messages.length === 0) {
+                switchSession(latestSession.id)
+                return
+              }
+              // 否则创建新会话
+              createSession()
+            }}
             block
           >
             新对话
@@ -306,7 +308,7 @@ export default function ChatPage() {
                 title="确定删除这个对话？"
                 onConfirm={(e) => {
                   e?.stopPropagation()
-                  handleDeleteSession(session.id)
+                  deleteSession(session.id)
                 }}
                 onCancel={(e) => e?.stopPropagation()}
               >
@@ -323,9 +325,7 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* 右侧对话区域 */}
       <div className="chat-container">
-        {/* 消息列表 */}
         <div className="messages-container">
           {messages.length === 0 ? (
             <div className="empty-chat">
@@ -333,67 +333,41 @@ export default function ChatPage() {
               <h2>您好，{user?.realName || user?.username}！</h2>
               <p>我是您的AI采购助手，有什么可以帮您的吗？</p>
               <div className="quick-actions">
-                <Card
-                  className="quick-action-card"
-                  onClick={() => setInputValue('帮我创建一个采购申请')}
-                >
-                  <p>📝 创建采购申请</p>
+                <Card className="quick-action-card" onClick={() => setInputValue('帮我创建一个采购订单')}>
+                  <p>📝 创建采购订单</p>
                 </Card>
-                <Card
-                  className="quick-action-card"
-                  onClick={() => setInputValue('推荐一些优质供应商')}
-                >
+                <Card className="quick-action-card" onClick={() => setInputValue('推荐一些优质供应商')}>
                   <p>🏪 推荐供应商</p>
                 </Card>
-                <Card
-                  className="quick-action-card"
-                  onClick={() => setInputValue('查询最近的采购订单')}
-                >
+                <Card className="quick-action-card" onClick={() => setInputValue('查询最近的采购订单')}>
                   <p>📋 查询订单</p>
                 </Card>
-                <Card
-                  className="quick-action-card"
-                  onClick={() => setInputValue('分析最近的采购数据')}
-                >
-                  <p>📊 数据分析</p>
+                <Card className="quick-action-card" onClick={() => setInputValue('查询库存情况')}>
+                  <p>📊 库存查询</p>
                 </Card>
               </div>
             </div>
           ) : (
             messages.map((message) => (
-              <div
-                key={message.id}
-                className={`message-wrapper message-fade-in ${message.role}`}
-              >
+              <div key={message.id} className={`message-wrapper message-fade-in ${message.role}`}>
                 <div className="message-avatar">
                   <Avatar
                     size={40}
-                    style={{
-                      backgroundColor:
-                        message.role === 'user' ? '#667eea' : '#8b5cf6',
-                    }}
-                    icon={
-                      message.role === 'user' ? (
-                        <UserOutlined />
-                      ) : (
-                        <RobotOutlined />
-                      )
-                    }
+                    style={{ backgroundColor: message.role === 'user' ? '#667eea' : '#8b5cf6' }}
+                    icon={message.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
                   >
-                    {message.role === 'user'
-                      ? user?.realName?.[0] || user?.username?.[0]
-                      : 'AI'}
+                    {message.role === 'user' ? user?.realName?.[0] || user?.username?.[0] : 'AI'}
                   </Avatar>
                 </div>
                 <div className="message-content">
-                  {message.loading && !message.content && !message.thinking ? (
+                  {message.loading && !message.content && !message.thinking && !(message.events?.length) ? (
                     <div className="message-loading">
                       <Spin size="small" />
                       <span>AI正在思考中...</span>
                     </div>
                   ) : (
                     <>
-                      {/* 思考过程（可折叠） - 加载时默认展开，完成后折叠 */}
+                      {/* 思考过程 */}
                       {message.thinking && (
                         <ThinkingCollapse
                           thinking={message.thinking}
@@ -401,28 +375,26 @@ export default function ChatPage() {
                           thinkingTimeMs={message.thinkingTimeMs}
                         />
                       )}
-                      {message.intent && (
-                        <Tag color="blue" className="intent-tag">
-                          意图: {message.intent}
-                        </Tag>
-                      )}
-                      <div className="message-text">
-                        {message.role === 'assistant' ? (
+
+                      {/* 流式事件（文字+工具按顺序） */}
+                      {message.events && message.events.length > 0 ? (
+                        <StreamEventsDisplay events={message.events} isLoading={message.loading} />
+                      ) : (
+                        <div className="message-text">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {message.content}
                           </ReactMarkdown>
-                        ) : (
-                          message.content
-                        )}
-                        {message.loading && <span className="typing-cursor">▌</span>}
-                      </div>
+                          {message.loading && <span className="typing-cursor">▌</span>}
+                        </div>
+                      )}
+
                       <div className="message-meta">
                         <span className="message-time">
                           {new Date(message.timestamp).toLocaleTimeString()}
                         </span>
                         {message.processingTimeMs && (
                           <span className="message-duration">
-                            {`耗时 ${formatDuration(message.processingTimeMs)}`}
+                            耗时 {formatDuration(message.processingTimeMs)}
                           </span>
                         )}
                       </div>
@@ -435,7 +407,6 @@ export default function ChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* 输入区域 */}
         <div className="input-container">
           <div className="input-wrapper">
             <Input.TextArea
@@ -447,34 +418,17 @@ export default function ChatPage() {
               className="chat-input"
             />
             <Space>
-              <Popconfirm
-                title="确定清空当前对话？"
-                onConfirm={handleClearChat}
-              >
-                <Button
-                  icon={<ReloadOutlined />}
-                  disabled={messages.length === 0 || loading}
-                >
+              <Popconfirm title="确定清空当前对话？" onConfirm={clearCurrentSession}>
+                <Button icon={<ReloadOutlined />} disabled={messages.length === 0 || loading}>
                   清空
                 </Button>
               </Popconfirm>
               {loading ? (
-                <Button
-                  danger
-                  icon={<StopOutlined />}
-                  onClick={handleStop}
-                  className="stop-button"
-                >
+                <Button danger icon={<StopOutlined />} onClick={handleStop}>
                   停止
                 </Button>
               ) : (
-                <Button
-                  type="primary"
-                  icon={<SendOutlined />}
-                  onClick={handleSend}
-                  disabled={!inputValue.trim()}
-                  className="send-button"
-                >
+                <Button type="primary" icon={<SendOutlined />} onClick={handleSend} disabled={!inputValue.trim()}>
                   发送
                 </Button>
               )}

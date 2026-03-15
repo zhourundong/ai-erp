@@ -247,7 +247,7 @@ class PurchaseOrderServiceTest {
         // 模拟库存入库返回
         Inventory mockInventory = new Inventory();
         mockInventory.setQuantity(new BigDecimal("10"));
-        when(inventoryService.stockIn(anyLong(), anyLong(), any(), any(), any(), any(), any(), anyLong(), any(), any()))
+        when(inventoryService.stockIn(anyLong(), anyLong(), any(), any(), any(), any(), any(), any(), anyLong(), any(), any()))
                 .thenReturn(mockInventory);
 
         ReceiveRequest.ReceiveItem receiveItem = new ReceiveRequest.ReceiveItem();
@@ -260,7 +260,7 @@ class PurchaseOrderServiceTest {
         // Then
         assertEquals("COMPLETED", result.getStatus());
         assertNotNull(result.getActualDeliveryDate());
-        verify(inventoryService).stockIn(eq(1L), eq(100L), any(), any(), eq(new BigDecimal("10")), any(), any(), eq(1L), any(), eq("张三"));
+        verify(inventoryService).stockIn(eq(1L), eq(100L), any(), any(), eq(new BigDecimal("10")), any(), any(), any(), eq(1L), any(), eq("张三"));
     }
 
     @Test
